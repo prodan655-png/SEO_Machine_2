@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SEO Аналізатор - інструмент для аналізу та оптимізації контенту">
+    <title>SEO Аналізатор</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <h1>🔍 SEO Аналізатор</h1>
+                    <p class="tagline">Професійний аналіз контенту для TOP-10</p>
+                </div>
+                <div class="api-status">
+                    <span class="status-dot" id="apiStatus"></span>
+                    <span class="status-text" id="apiStatusText">Перевірка...</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- Tabs Navigation -->
+            <nav class="tabs">
+                <button class="tab-btn active" data-tab="create">
+                    <span class="tab-icon">➕</span>
+                    Новий Аналіз
+                </button>
+                <button class="tab-btn" data-tab="results" id="resultsTab" disabled>
+                    <span class="tab-icon">📊</span>
+                    Результати
+                </button>
+                <button class="tab-btn" data-tab="scoring" id="scoringTab" disabled>
+                    <span class="tab-icon">✍️</span>
+                    Оцінка Контенту
+                </button>
+            </nav>
+
+            <!-- Tab Content -->
+            <div class="tab-content">
+                <!-- Create Analysis Tab -->
+                <div class="tab-pane active" id="createTab">
+                    <div class="card">
+                        <h2>Створити новий аналіз</h2>
+                        <p class="card-description">Введіть ключове слово для аналізу TOP-10 результатів пошуку</p>
+                        
+                        <form id="analysisForm" class="form">
+                            <div class="form-group">
+                                <label for="keyword">Ключове слово *</label>
+                                <input 
+                                    type="text" 
+                                    id="keyword" 
+                                    name="keyword" 
+                                    placeholder="напр. seo оптимізація"
+                                    required
+                                    minlength="2"
+                                    maxlength="100"
+                                >
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="language">Мова</label>
+                                    <select id="language" name="language">
+                                        <option value="uk">🇺🇦 Українська</option>
+                                        <option value="en">🇬🇧 English</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="location">Локація</label>
+                                    <input 
+                                        type="text" 
+                                        id="location" 
+                                        name="location" 
+                                        value="Ukraine"
+                                        maxlength="100"
+                                    >
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="device">Пристрій</label>
+                                <div class="radio-group">
+                                    <label class="radio-label">
+                                        <input type="radio" name="device" value="desktop" checked>
+                                        <span>💻 Desktop</span>
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="device" value="mobile">
+                                        <span>📱 Mobile</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary" id="submitBtn">
+                                <span class="btn-text">Розпочати аналіз</span>
+                                <span class="btn-loader hidden">
+                                    <span class="spinner"></span>
+                                    Обробка...
+                                </span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Results Tab -->
+                <div class="tab-pane" id="resultsTab">
+                    <!-- Analysis Status -->
+                    <div class="card" id="statusCard">
+                        <div class="status-header">
+                            <h3>Статус аналізу</h3>
+                            <span class="badge" id="statusBadge">Обробка...</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <p class="status-message" id="statusMessage">Завантаження даних з пошукової видачі...</p>
+                    </div>
+
+                    <!-- Results Content (hidden until completed) -->
+                    <div id="resultsContent" class="hidden">
+                        <!-- Competitors Section -->
+                        <div class="card">
+                            <h3>📈 Конкуренти (TOP-10)</h3>
+                            <div class="table-wrapper">
+                                <table class="competitors-table" id="competitorsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>URL</th>
+                                            <th>Заголовок</th>
+                                            <th>Слова</th>
+                                            <th>Статус</th>
+                                            <th>Увімкнути</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="competitorsBody">
+                                        <!-- Populated by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Terms Section -->
+                        <div class="card">
+                            <h3>🔑 Ключові терміни</h3>
+                            <p class="card-description">Рекомендована частота використання термінів</p>
+                            <div class="table-wrapper">
+                                <table class="terms-table" id="termsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Термін</th>
+                                            <th>Мін</th>
+                                            <th>Макс</th>
+                                            <th>Медіана</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="termsBody">
+                                        <!-- Populated by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Guidelines Section -->
+                        <div class="card">
+                            <h3>📋 Рекомендації</h3>
+                            <div class="guidelines-grid" id="guidelinesGrid">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scoring Tab -->
+                <div class="tab-pane" id="scoringTab">
+                    <div class="scoring-layout">
+                        <!-- Editor Section -->
+                        <div class="card editor-card">
+                            <div class="editor-header">
+                                <h3>✍️ Ваш контент</h3>
+                                <div class="format-selector">
+                                    <label>
+                                        <input type="radio" name="format" value="html" checked>
+                                        HTML
+                                    </label>
+                                    <label>
+                                        <input type="radio" name="format" value="markdown">
+                                        Markdown
+                                    </label>
+                                </div>
+                            </div>
+                            <textarea 
+                                id="contentEditor" 
+                                class="content-editor"
+                                placeholder="Вставте або напишіть свій контент тут...&#10;&#10;Приклад HTML:&#10;<h1>Заголовок</h1>&#10;<p>Ваш текст...</p>"
+                            ></textarea>
+                            <div class="editor-stats">
+                                <span>Слів: <strong id="wordCount">0</strong></span>
+                                <span>Символів: <strong id="charCount">0</strong></span>
+                            </div>
+                        </div>
+
+                        <!-- Score Display Section -->
+                        <div class="card score-card">
+                            <h3>📊 Оцінка</h3>
+                            
+                            <!-- Total Score -->
+                            <div class="score-circle-container">
+                                <svg class="score-circle" viewBox="0 0 200 200">
+                                    <circle class="score-circle-bg" cx="100" cy="100" r="90"></circle>
+                                    <circle class="score-circle-fill" cx="100" cy="100" r="90" id="scoreCircle"></circle>
+                                </svg>
+                                <div class="score-value">
+                                    <span class="score-number" id="scoreNumber">0</span>
+                                    <span class="score-max">/100</span>
+                                </div>
+                            </div>
+
+                            <!-- Score Breakdown -->
+                            <div class="score-breakdown" id="scoreBreakdown">
+                                <div class="score-item">
+                                    <span class="score-label">Терміни</span>
+                                    <div class="score-bar">
+                                        <div class="score-bar-fill" id="termsBar" style="width: 0%"></div>
+                                    </div>
+                                    <span class="score-text" id="termsScore">0/60</span>
+                                </div>
+                                <div class="score-item">
+                                    <span class="score-label">Структура</span>
+                                    <div class="score-bar">
+                                        <div class="score-bar-fill" id="structureBar" style="width: 0%"></div>
+                                    </div>
+                                    <span class="score-text" id="structureScore">0/20</span>
+                                </div>
+                                <div class="score-item">
+                                    <span class="score-label">Заголовки</span>
+                                    <div class="score-bar">
+                                        <div class="score-bar-fill" id="headingsBar" style="width: 0%"></div>
+                                    </div>
+                                    <span class="score-text" id="headingsScore">0/20</span>
+                                </div>
+                            </div>
+
+                            <!-- Recommendations -->
+                            <div class="recommendations hidden" id="recommendations">
+                                <h4>💡 Рекомендації</h4>
+                                <ul id="recommendationsList"></ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Term Details -->
+                    <div class="card hidden" id="termDetailsCard">
+                        <h3>🔍 Аналіз термінів</h3>
+                        <div class="terms-grid" id="termsGrid">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>
+                SEO Аналізатор v1.0 | 
+                <a href="https://github.com/prodan655-png/SEO_Machine_2" target="_blank">GitHub</a>
+            </p>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
