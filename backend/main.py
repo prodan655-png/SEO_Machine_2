@@ -185,7 +185,7 @@ async def process_analysis_task(analysis_id: str):
             images_confidence=guidelines_data.get('confidence', 1.0),
             suggested_outline=guidelines_data.get('suggested_outline', []),
             warnings=guidelines_data.get('warnings', []),
-            competitors_analyzed=len([c for c in extracted_data if c.get('status') == 'valid'])
+            competitors_analyzed=len([c for c in extracted_data if isinstance(c, dict) and c.get('status') == 'valid'])
         )
         db.add(guideline)
         
