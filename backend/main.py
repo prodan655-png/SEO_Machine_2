@@ -93,7 +93,7 @@ class HealthResponse(BaseModel):
 
 
 # Background task function
-def process_analysis_task(analysis_id: str):
+async def process_analysis_task(analysis_id: str):
     """
     Background task to process SEO analysis.
     Fetches SERP, extracts content, analyzes competitors, generates guidelines.
@@ -113,7 +113,7 @@ def process_analysis_task(analysis_id: str):
         serp_data = fetch_serp(analysis.keyword, analysis.language)
         
         if 'error' in serp_data:
-            analysis.status = 'failed'
+            analysis.status = AnalysisStatus.FAILED
             analysis.error_message = serp_data['error']
             db.commit()
             logger.error(f"SERP fetch failed for {analysis_id}: {serp_data['error']}")
@@ -121,7 +121,7 @@ def process_analysis_task(analysis_id: str):
         
         # Step 2: Extract competitor content in batch
         competitor_urls = [result['url'] for result in serp_data['results']]
-        extracted_data = batch_extract_competitors(competitor_urls)
+        extracted_data = await batch_extract_competitors(competitor_urls)
         
         # Step 3: Save competitors to database
         for i, comp_data in enumerate(extracted_data):
@@ -190,14 +190,14 @@ def process_analysis_task(analysis_id: str):
         db.add(guideline)
         
         # Update analysis status
-        analysis.status = 'COMPLETED'
+        analysis.status = AnalysisStatus.COMPLETED
         
         db.commit()
         logger.info(f"Analysis {analysis_id} completed successfully")
         
     except Exception as e:
         logger.error(f"Error processing analysis {analysis_id}: {str(e)}", exc_info=True)
-        analysis.status = 'FAILED'
+        analysis.status = AnalysisStatus.FAILED
         analysis.error_message = str(e)
         db.commit()
         
@@ -227,7 +227,7 @@ async def create_analysis(
             language=request.language,
             location=request.location,
             device=request.device,
-            status='PROCESSING'
+            status=AnalysisStatus.PROCESSING
         )
         
         db.add(analysis)
@@ -236,10 +236,10 @@ async def create_analysis(
         
         analysis_id = str(analysis.id)
         
-        # Trigger background task
+        # Trigger background task - FastAPI handles async automatically
         background_tasks.add_task(process_analysis_task, analysis_id)
         
-        logger.info(f"Created analysis {analysis_id} for keyword '{request.keyword}'")
+        logger.info(f"Created analysis {analysis_id} for keyword '{request.keyword}''")
         
         return AnalysisCreateResponse(
             analysis_id=analysis_id,
