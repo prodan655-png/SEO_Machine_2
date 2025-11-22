@@ -280,14 +280,15 @@ async def get_analysis(analysis_id: str):
             "id": str(analysis.id),
             "keyword": analysis.keyword,
             "language": analysis.language,
-            "status": analysis.status,
+            "status": analysis.status.value if hasattr(analysis.status, 'value') else str(analysis.status),
             "created_at": analysis.created_at.isoformat() if analysis.created_at else None,
-            "completed_at": analysis.completed_at.isoformat() if analysis.completed_at else None,
+            "updated_at": analysis.updated_at.isoformat() if analysis.updated_at else None,
             "error_message": analysis.error_message
         }
         
         # If completed, include full data
-        if analysis.status == 'completed':
+        status_str = analysis.status.value if hasattr(analysis.status, 'value') else str(analysis.status)
+        if status_str == 'COMPLETED':
             # Get terms
             terms = db.query(Term).filter(Term.analysis_id == analysis_id).all()
             response['terms'] = [
@@ -467,25 +468,28 @@ async def health_check():
     )
 
 
+
 # Error handlers
+from fastapi.responses import JSONResponse
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
     """Handle HTTP exceptions."""
     logger.warning(f"HTTP {exc.status_code}: {exc.detail}")
-    return {
-        "error": exc.detail,
-        "status_code": exc.status_code
-    }
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": exc.detail}
+    )
 
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request, exc):
     """Handle general exceptions."""
     logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
-    return {
-        "error": "Internal server error",
-        "status_code": 500
-    }
+    return JSONResponse(
+        status_code=500,
+        content={"error": "Internal server error"}
+    )
 
 
 if __name__ == "__main__":
