@@ -1,0 +1,81 @@
+# SEO Analyzer Configuration
+
+# SERP Settings
+serp:
+  default_results: 10  # Number of SERP results to fetch (10 or 20)
+  position_weights: [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]  # Weight by position
+  request_timeout: 30  # Timeout in seconds
+  retry_attempts: 3
+  retry_delay: 2  # Seconds between retries
+
+# Content Extraction
+content_extraction:
+  min_word_count: 200  # Minimum words to consider valid
+  max_redirects: 5
+  request_timeout: 30
+  user_agents:
+    - "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    - "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+
+# Semantic Analysis
+semantic_analyzer:
+  top_terms_limit: 80  # Maximum number of terms to extract
+  min_docs_used_in: 3  # Term must appear in at least N competitors
+  ngrams: [1, 2, 3]  # Unigrams, bigrams, trigrams
+  stop_words_path: "backend/stop_words/"
+
+# Guidelines Generator
+guidelines:
+  min_competitors: 3  # Minimum valid competitors needed
+  outlier_iqr_multiplier: 1.5  # IQR multiplier for outlier detection
+  thin_serp_range_multiplier: 1.3  # Widen ranges by 30% if <3 competitors
+
+# Content Scoring
+scoring:
+  weights:
+    terms: 60  # Term coverage score (0-60)
+    structure: 20  # Structure score (0-20)
+    headings: 20  # Headings score (0-20)
+  term_coverage:
+    over_optimization_multiplier: 1.5  # Penalty if term used >max * this value
+  structure:
+    word_count_weight: 10
+    images_weight: 5
+    paragraphs_weight: 5
+  headings:
+    h1_weight: 5
+    h2_h3_count_weight: 10
+    terms_in_headings_weight: 5
+
+# AI Features
+ai:
+  enabled: false  # Controlled by environment variable
+  provider: "gemini"  # gemini | openai | anthropic | mock
+  model: "gemini-1.5-pro"
+  temperature: 0.7
+  max_tokens: 4000
+  features_enabled:
+    - brief
+    - enhance
+    - meta
+    - coach
+    - intent
+  rate_limits:  # Requests per hour
+    brief: 10
+    enhance: 20
+    meta: 15
+    coach: 10
+    intent: 5
+
+# Logging
+logging:
+  level: "INFO"  # Overridden by LOG_LEVEL env var
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/seo_analyzer.log"
+
+# Security
+security:
+  max_draft_length: 50000  # Maximum characters in draft text
+min_keyword_length: 2
+  max_keyword_length: 100
+  allowed_html_tags: ["h1", "h2", "h3", "p", "strong", "em", "ul", "ol", "li", "br"]
