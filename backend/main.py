@@ -20,7 +20,7 @@ from sqlalchemy.orm import sessionmaker, Session
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import DATABASE_URL, ALLOWED_ORIGINS
-from database import Base, Analysis, Competitor, Term, Guideline
+from database import Base, Analysis, Competitor, Term, Guideline, AnalysisStatus
 from logger import setup_logger
 from modules.serp_fetcher import fetch_serp
 from modules.content_extractor import batch_extract_competitors
