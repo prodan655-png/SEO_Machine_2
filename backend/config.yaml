@@ -76,6 +76,6 @@ logging:
 # Security
 security:
   max_draft_length: 50000  # Maximum characters in draft text
-min_keyword_length: 2
+  min_keyword_length: 2
   max_keyword_length: 100
   allowed_html_tags: ["h1", "h2", "h3", "p", "strong", "em", "ul", "ol", "li", "br"]

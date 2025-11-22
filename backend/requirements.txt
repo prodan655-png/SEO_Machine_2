@@ -26,6 +26,7 @@ pyyaml==6.0.1
 
 # HTML sanitization (security)
 bleach==6.1.0
+markdown==3.5.1  # For Markdown to HTML conversion
 
 # Rate limiting
 slowapi==0.1.9
