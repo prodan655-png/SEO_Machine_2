@@ -26,9 +26,9 @@ wheels/
 
 # Environment
 .env
-!.env.development
-!.env.production
-!.env.example
+.env.development
+.env.production
+.env.local
 
 # Database
 *.db
