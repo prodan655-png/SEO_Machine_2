@@ -20,7 +20,8 @@ class ContentWriter:
         self,
         brief: Dict[str, Any],
         tone: str = "professional",
-        language: str = "uk"
+        language: str = "uk",
+        improvement_instructions: Optional[str] = None
     ) -> str:
         """
         Write a full article based on the brief.
@@ -34,7 +35,7 @@ class ContentWriter:
             HTML formatted article
         """
         try:
-            prompt = self._build_prompt(brief, tone, language)
+            prompt = self._build_prompt(brief, tone, language, improvement_instructions)
             
             # We need a longer response for full articles
             response = await self.ai_client.generate_content(
@@ -44,7 +45,17 @@ class ContentWriter:
             )
             
             logger.info("Generated article content")
-            return response
+            
+            # Clean markdown artifacts
+            content = response
+            if content.startswith('```html'):
+                content = content[7:]
+            if content.startswith('```'):
+                content = content[3:]
+            if content.endswith('```'):
+                content = content[:-3]
+            
+            return content.strip()
             
         except Exception as e:
             logger.error(f"Content writing failed: {str(e)}")
@@ -54,7 +65,8 @@ class ContentWriter:
         self,
         brief: Dict[str, Any],
         tone: str,
-        language: str
+        language: str,
+        improvement_instructions: Optional[str] = None
     ) -> str:
         """Build the prompt for writing."""
         
@@ -86,17 +98,32 @@ class ContentWriter:
 - Текст має бути унікальним.
 - Уникай "води" і загальних фраз.
 - Довжина має відповідати оцінці в брифі.
+"""
+        if improvement_instructions:
+            prompt += f"""
+!!! ВАЖЛИВО: ІНСТРУКЦІЇ ДЛЯ ПОКРАЩЕННЯ (SEO COACH) !!!
+Ти повинен суворо дотримуватися цих рекомендацій, щоб підвищити SEO оцінку статті:
+{improvement_instructions}
+!!! КІНЕЦЬ ІНСТРУКЦІЙ !!!
+"""
 
+        prompt += """
 Починай писати одразу HTML код статті:
 """
+        
+        logger.info(f"📝 AI PROMPT (Coach Instructions included: {bool(improvement_instructions)})")
+        if improvement_instructions:
+            logger.info(f"Coach Instructions:\n{improvement_instructions}")
+        
         return prompt
 
 
 async def write_article(
     brief: Dict[str, Any],
     tone: str = "professional",
-    language: str = "uk"
+    language: str = "uk",
+    improvement_instructions: Optional[str] = None
 ) -> str:
     """Convenience wrapper for ContentWriter."""
     writer = ContentWriter()
-    return await writer.write_article(brief, tone, language)
+    return await writer.write_article(brief, tone, language, improvement_instructions)

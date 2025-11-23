@@ -57,6 +57,9 @@ const elements = {
     recommendations: document.getElementById('recommendations'),
     recommendationsList: document.getElementById('recommendationsList'),
 
+    // AI Writer
+    useCoachCheckbox: document.getElementById('useCoachCheckbox'),
+
     // Toast
     toastContainer: document.getElementById('toastContainer'),
 
@@ -604,6 +607,10 @@ async function getSEOCoaching() {
 
         const coaching = await response.json();
         console.log('DEBUG Received coaching:', coaching);
+
+        // Store for AI Writer
+        state.lastCoaching = coaching;
+
         displayCoachingPanel(coaching, currentScore, targetScore);
 
     } catch (error) {
@@ -743,6 +750,46 @@ function displayCoachingPanel(coaching, currentScore, targetScore) {
     }
 
     coachContent.innerHTML = html;
+
+    // Add "Rewrite" button if we are in AI Writer flow or have a brief
+    if (currentBrief) {
+        const btnContainer = document.createElement('div');
+        btnContainer.style.marginTop = '2rem';
+        btnContainer.style.textAlign = 'center';
+        btnContainer.innerHTML = `
+            <button class="btn btn-primary" onclick="rewriteWithCoach()" style="width: 100%;">
+                <span class="btn-text">🔄 Переписати з рекомендаціями</span>
+            </button>
+        `;
+        coachContent.appendChild(btnContainer);
+    }
+}
+
+function rewriteWithCoach() {
+    // 1. Close coach panel
+    closeCoachPanel();
+
+    // 2. Switch to AI Writer tab
+    switchTab('ai-writer');
+
+    // 3. Reset to Step 2 (Brief) if we are in Step 3, to allow regeneration
+    document.getElementById('aiStep3').classList.add('hidden');
+    document.getElementById('aiStep2').classList.remove('hidden');
+
+    // 4. Check the "Use Coach" checkbox
+    if (elements.useCoachCheckbox) {
+        elements.useCoachCheckbox.checked = true;
+    }
+
+    // 5. Scroll to generate button
+    const generateBtn = document.querySelector('#aiStep2 .btn-primary');
+    if (generateBtn) {
+        generateBtn.scrollIntoView({ behavior: 'smooth' });
+
+        // Auto-trigger generation
+        showToast('🔄 Покращуємо статтю...', 'info');
+        generateArticle();
+    }
 }
 
 function closeCoachPanel() {
@@ -835,13 +882,34 @@ async function generateArticle() {
     loader.classList.remove('hidden');
 
     try {
+        const useCoach = document.getElementById('useCoachCheckbox')?.checked;
+        let coachActions = null;
+
+        if (useCoach && state.lastCoaching) {
+            // Format coach actions for the AI
+            coachActions = state.lastCoaching.priority_actions
+                .map(a => `- ${a.action} (${a.details})`)
+                .join('\n');
+
+            if (state.lastCoaching.term_recommendations?.add_more) {
+                coachActions += '\n\nТакож додай ці терміни: ' +
+                    state.lastCoaching.term_recommendations.add_more.join(', ');
+            }
+        }
+
+        console.log('🚀 Sending to AI Writer:', {
+            brief: currentBrief,
+            coachActions: coachActions
+        });
+
         const response = await fetch(`${API_BASE_URL}/api/ai/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 brief: currentBrief,
                 tone: 'professional',
-                language: document.getElementById('language').value
+                language: document.getElementById('language').value,
+                coach_actions: coachActions
             })
         });
 
@@ -850,13 +918,13 @@ async function generateArticle() {
         const result = await response.json();
 
         // Store result temporarily
-        state.generatedContent = result.content;
+        state.generatedContent = result.article;
 
         // Show preview
         const previewDiv = document.getElementById('articlePreview');
         const htmlCode = document.getElementById('htmlCode');
-        previewDiv.innerHTML = result.content;
-        htmlCode.value = result.content;
+        previewDiv.innerHTML = result.article;
+        htmlCode.value = result.article;
 
         // Show step 3
         document.getElementById('aiStep2').classList.add('hidden');
@@ -880,10 +948,13 @@ function copyToEditor() {
         }
         handleEditorInput(); // Trigger scoring
         switchTab('scoring');
-        showToast('Контент перенесено в редактор', 'success');
+        showToast('Контент перенесено в редактор. Перевірте оцінку!', 'success');
 
         // Reset steps
-        resetAiSteps();
+        // resetAiSteps(); // Don't reset steps to allow iterative workflow
+        document.getElementById('aiStep1').classList.add('hidden'); // Hide brief input
+        document.getElementById('aiStep2').classList.add('hidden'); // Hide generation
+        document.getElementById('aiStep3').classList.add('hidden'); // Hide preview
     }
 }
 

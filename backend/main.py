@@ -640,14 +640,17 @@ async def generate_content_brief(request: BriefRequest):
         db.close()
 
 
-class GenerateRequest(BaseModel):
+from typing import Optional
+
+class ArticleRequest(BaseModel):
     brief: Dict[str, Any]
     tone: str = "professional"
     language: str = "uk"
+    coach_actions: Optional[str] = None
 
 
 @app.post("/api/ai/generate", tags=["AI"])
-async def generate_article_content(request: GenerateRequest):
+async def generate_article_content(request: ArticleRequest):
     """
     Generate full article from brief.
     """
@@ -658,16 +661,35 @@ async def generate_article_content(request: GenerateRequest):
     try:
         from modules.ai.content_writer import write_article
         
-        content = await write_article(
+        article_html = await write_article(
             brief=request.brief,
             tone=request.tone,
-            language=request.language
+            language=request.language,
+            improvement_instructions=request.coach_actions
         )
         
-        return {"content": content}
+        return {"article": article_html}
         
     except Exception as e:
         logger.error(f"Content generation error: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class SitemapRequest(BaseModel):
+    url: str
+
+
+@app.post("/api/tools/sitemap", tags=["Tools"])
+async def parse_sitemap_url(request: SitemapRequest):
+    """
+    Parse sitemap XML and return URLs.
+    """
+    try:
+        from modules.sitemap_parser import parse_sitemap
+        urls = parse_sitemap(request.url)
+        return {"urls": urls, "count": len(urls)}
+    except Exception as e:
+        logger.error(f"Sitemap parsing error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
