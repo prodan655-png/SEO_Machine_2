@@ -7,6 +7,7 @@
     <meta name="description" content="SEO Аналізатор - інструмент для аналізу та оптимізації контенту">
     <title>SEO Аналізатор</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="layout-redesign.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -369,6 +370,18 @@
                                 </label>
                             </div>
 
+                            <div class="form-group" style="margin: 1rem 0;">
+                                <label class="checkbox-label"
+                                    style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                    <input type="checkbox" id="generateImagesCheckbox" checked>
+                                    <span>🎨 Генерувати зображення (AI Imagen)</span>
+                                </label>
+                                <small
+                                    style="display: block; margin-left: 1.75rem; color: var(--text-secondary); font-size: 0.875rem;">
+                                    Автоматично створить 3 релевантних зображення для статті
+                                </small>
+                            </div>
+
                             <div class="step-actions">
                                 <button class="btn btn-secondary" onclick="resetAiSteps()">Назад</button>
                                 <button class="btn btn-primary" onclick="generateArticle()">
@@ -479,6 +492,9 @@
         </div>
     </footer>
 
+    <script src="diff-tracking.js"></script>
+    <script src="keyword-highlighting.js"></script>
+    <script src="surfer-integration.js"></script>
     <script src="app.js"></script>
 </body>
 

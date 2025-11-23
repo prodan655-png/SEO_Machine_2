@@ -436,6 +436,11 @@ function displayScore(scoreData) {
     if (scoreData.structure_details || scoreData.headings_details) {
         generateRecommendations(scoreData);
     }
+
+    // Update Guidelines sidebar (if using Surfer layout)
+    if (typeof updateGuidelinesSidebar === 'function') {
+        updateGuidelinesSidebar(state.analysisData, scoreData);
+    }
 }
 
 function animateScore(targetScore) {
@@ -614,6 +619,19 @@ async function getSEOCoaching() {
         state.lastCoaching = coaching;
 
         displayCoachingPanel(coaching, currentScore, targetScore);
+
+        // Show diff modal if we have changes
+        if (coaching.changes && coaching.changes.length > 0 && coaching.revised_content) {
+            const currentContent = elements.contentEditor?.value || '';
+            const scoreGain = coaching.expected_score_gain || 10;
+
+            setTimeout(() => {
+                if (typeof showDiffModal === 'function') {
+                    showDiffModal(currentContent, coaching.revised_content, coaching.changes, scoreGain);
+                }
+            }, 500);
+        }
+
 
     } catch (error) {
         console.error('Coaching error:', error);
@@ -926,11 +944,43 @@ async function generateArticle() {
         // Store result temporarily
         state.generatedContent = result.article;
 
-        // Show preview
+        // Check if should generate images
+        const shouldGenerateImages = document.getElementById('generateImagesCheckbox')?.checked;
+
+        let finalArticle = result.article;
+
+        if (shouldGenerateImages && state.currentAnalysisId) {
+            try {
+                showToast('🎨 Генерую зображення...', 'info');
+
+                const imageResponse = await fetch(`${API_BASE_URL}/api/ai/generate-images`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        analysis_id: state.currentAnalysisId,
+                        article_html: result.article,
+                        num_images: 3
+                    })
+                });
+
+                if (imageResponse.ok) {
+                    const imageResult = await imageResponse.json();
+                    finalArticle = imageResult.updated_html;
+                    showToast(`✅ Згенеровано ${imageResult.count} зображень!`, 'success');
+                } else {
+                    console.warn('Image generation failed, continuing without images');
+                }
+            } catch (imageError) {
+                console.error('Image generation error:', imageError);
+                showToast('⚠️ Не вдалося згенерувати зображення', 'warning');
+            }
+        }
+
+        // Show preview with or without images
         const previewDiv = document.getElementById('articlePreview');
         const htmlCode = document.getElementById('htmlCode');
-        previewDiv.innerHTML = result.article;
-        htmlCode.value = result.article;
+        previewDiv.innerHTML = finalArticle;
+        htmlCode.value = finalArticle;
 
         // Show step 3
         document.getElementById('aiStep2').classList.add('hidden');

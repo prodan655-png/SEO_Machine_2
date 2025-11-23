@@ -805,6 +805,59 @@ async def iterate_content(request: dict):
         db.close()
 
 
+class ImageGenerationRequest(BaseModel):
+    analysis_id: str
+    article_html: str
+    num_images: int = Field(default=3, ge=1, le=5)
+
+
+@app.post("/api/ai/generate-images", tags=["AI"])
+async def generate_images_endpoint(request: ImageGenerationRequest):
+    """
+    Generate AI images for article content.
+    
+    Uses Gemini Imagen to create relevant images for article sections.
+    """
+    from config import get_config
+    if not get_config('ai.enabled', False):
+        raise HTTPException(status_code=503, detail="AI features disabled")
+    
+    db: Session = SessionLocal()
+    try:
+        # Get analysis for keyword
+        analysis = db.query(Analysis).filter(Analysis.id == request.analysis_id).first()
+        if not analysis:
+            raise HTTPException(status_code=404, detail="Analysis not found")
+        
+        # Generate images
+        from modules.ai.image_generator import generate_article_images, insert_images_into_html
+        
+        logger.info(f"Generating {request.num_images} images for '{analysis.keyword}'")
+        
+        images = await generate_article_images(
+            article_html=request.article_html,
+            keyword=analysis.keyword,
+            num_images=request.num_images
+        )
+        
+        # Insert images into HTML
+        updated_html = insert_images_into_html(request.article_html, images)
+        
+        logger.info(f"Generated {len(images)} images successfully")
+        
+        return {
+            "images": images,
+            "updated_html": updated_html,
+            "count": len(images)
+        }
+        
+    except Exception as e:
+        logger.error(f"Image generation error: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
 # Error handlers
 from fastapi.responses import JSONResponse
 

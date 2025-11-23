@@ -203,8 +203,28 @@ class SEOCoach:
                 "add_more": [],
                 "reduce": []
             },
-            'estimated_time': '30-45 хвилин'
+            "changes": [
+                {
+                    "type": "add_term",
+                    "term": "ключовий термін",
+                    "location": "paragraph_1",
+                    "old_text": "Це текст без термінів",
+                    "new_text": "Це текст з ключовим терміном для покращення SEO",
+                    "reason": "Додано важливий термін для покращення релевантності"
+                },
+                {
+                    "type": "improve_heading",
+                    "location": "h2_1",
+                    "old_text": "Вступ",
+                    "new_text": "Вступ до ключового терміну та його використання",
+                    "reason": "Покращено заголовок додаванням ключових слів"
+                }
+            ],
+            "revised_content": "",  # Will be filled by AI in real implementation
+            "expected_score_gain": min(gap // 2, 15),
+            "estimated_time": "30-45 хвилин"
         }
+
 
     def get_single_action(
         self,
