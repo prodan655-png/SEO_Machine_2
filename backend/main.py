@@ -20,7 +20,8 @@ from sqlalchemy.orm import sessionmaker, Session
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import DATABASE_URL, ALLOWED_ORIGINS
-from database import Base, Analysis, Competitor, Term, Guideline, AnalysisStatus, get_db
+from database import SessionLocal, Analysis, Competitor, Term, Guideline, Draft, AnalysisStatus
+from config import get_config, get_db
 from logger import setup_logger
 from modules.serp_fetcher import fetch_serp
 from modules.content_extractor import batch_extract_competitors
@@ -691,6 +692,98 @@ async def parse_sitemap_url(request: SitemapRequest):
     except Exception as e:
         logger.error(f"Sitemap parsing error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/ai/iterate")
+async def iterate_content(request: dict):
+    """
+    Iteratively improve content with score validation.
+    
+    Request body:
+        content: Current content HTML
+        analysis_id: Analysis ID for guidelines/terms
+        max_iterations: Maximum iterations (default: 5)
+        target_score: Target score (default: 85)
+    """
+    if not get_config('ai.enabled', False):
+        raise HTTPException(status_code=503, detail="AI features disabled")
+    
+    db: Session = SessionLocal()
+    try:
+        content = request.get('content')
+        analysis_id = request.get('analysis_id')
+        max_iterations = request.get('max_iterations', 5)
+        target_score = request.get('target_score', 85)
+        
+        if not content or not analysis_id:
+            raise HTTPException(status_code=400, detail="Missing content or analysis_id")
+        
+        # Get analysis data
+        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        if not analysis:
+            raise HTTPException(status_code=404, detail="Analysis not found")
+        
+        # Get terms and guidelines
+        terms = db.query(Term).filter(Term.analysis_id == analysis_id).all()
+        guideline = db.query(Guideline).filter(Guideline.analysis_id == analysis_id).first()
+        
+        if not guideline:
+            raise HTTPException(status_code=404, detail="Guidelines not found")
+        
+        # Format data
+        terms_data = [{
+            'term': t.term,
+            'term_normalized': t.term_normalized,
+            'min_recommended': t.min_recommended,
+            'max_recommended': t.max_recommended
+        } for t in terms]
+        
+        guidelines_data = {
+            'word_count': {
+                'min': guideline.word_count_min,
+                'max': guideline.word_count_max,
+                'median': guideline.word_count_median
+            },
+            'headings': {
+                'min': guideline.headings_min,
+                'max': guideline.headings_max,
+                'median': guideline.headings_median
+            },
+            'images': {
+                'min': guideline.images_min,
+                'max': guideline.images_max,
+                'median': guideline.images_median
+            }
+        }
+        
+        # Calculate current score
+        from modules.content_scorer import compute_content_score
+        current_score_result = compute_content_score(
+            content,
+            guidelines_data,
+            terms_data,
+            format='html'
+        )
+        current_score = current_score_result['total_score']
+        
+        # Run iteration
+        from modules.ai.content_iterator import improve_iteratively
+        result = await improve_iteratively(
+            content,
+            guidelines_data,
+            terms_data,
+            current_score,
+            target_score,
+            max_iterations
+        )
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Iteration error: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 
 # Error handlers

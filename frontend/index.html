@@ -408,6 +408,40 @@
                                 style="height: 300px; font-family: monospace; margin-top: 1rem;"></textarea>
                         </div>
                     </div>
+
+                    <!-- Iteration Panel (Modal) -->
+                    <div class="iteration-modal hidden" id="iterationModal">
+                        <div class="iteration-content">
+                            <div class="iteration-header">
+                                <h3>🔄 Ітеративне покращення</h3>
+                                <button class="close-btn" onclick="closeIterationModal()">✕</button>
+                            </div>
+
+                            <div class="iteration-progress">
+                                <div class="progress-info">
+                                    <span class="score-tracker" id="iterationScoreTracker">54 → 85</span>
+                                    <span class="iteration-counter" id="iterationCounter">Крок 0/5</span>
+                                </div>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar-fill" id="iterationProgressBar" style="width: 0%"></div>
+                                </div>
+                            </div>
+
+                            <div class="iteration-steps" id="iterationSteps">
+                                <!-- Steps will be added dynamically -->
+                            </div>
+
+                            <div class="iteration-actions">
+                                <button class="btn btn-secondary" onclick="stopIteration()" id="stopIterationBtn">
+                                    <span class="btn-text">⏸️ Зупинити</span>
+                                </button>
+                                <button class="btn btn-primary hidden" onclick="closeIterationModal()"
+                                    id="doneIterationBtn">
+                                    <span class="btn-text">✅ Готово</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

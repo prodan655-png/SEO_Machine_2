@@ -117,6 +117,89 @@ class ContentWriter:
         
         return prompt
 
+    async def edit_content(
+        self,
+        current_content: str,
+        action: Dict[str, Any],
+        language: str = "uk"
+    ) -> str:
+        """
+        Edit existing content with a single specific change.
+        
+        Args:
+            current_content: Current HTML content
+            action: Action to apply (from Coach)
+            language: Content language
+            
+        Returns:
+            Edited HTML content
+        """
+        prompt = self._build_edit_prompt(current_content, action, language)
+        
+        try:
+            response = await self.ai_client.generate_content(
+                prompt,
+                temperature=0.5,
+                max_tokens=8000
+            )
+            
+            # Clean markdown artifacts
+            import re
+            response = re.sub(r'^```html\s*', '', response, flags=re.MULTILINE)
+            response = re.sub(r'\s*```$', '', response, flags=re.MULTILINE)
+            response = response.strip()
+            
+            logger.info(f"Edited content with action: {action.get('description', 'unknown')}")
+            return response
+            
+        except Exception as e:
+            logger.error(f"Content editing failed: {str(e)}")
+            raise
+    
+    def _build_edit_prompt(
+        self,
+        current_content: str,
+        action: Dict[str, Any],
+        language: str
+    ) -> str:
+        """
+        Build prompt for editing content.
+        
+        Args:
+            current_content: Current content
+            action: Action to apply
+            language: Content language
+            
+        Returns:
+            Prompt string
+        """
+        action_desc = action.get('description', '')
+        action_details = action.get('details', '')
+        
+        prompt = f"""
+Ти професійний редактор контенту. Твоє завдання - зробити ОДНУ конкретну зміну в тексті.
+
+ПОТОЧНИЙ КОНТЕНТ:
+{current_content}
+
+ЗАВДАННЯ:
+{action_desc}
+
+ДЕТАЛІ:
+{action_details}
+
+ПРАВИЛА:
+1. Зроби ТІЛЬКИ цю одну зміну
+2. НЕ видаляй існуючий контент
+3. НЕ змінюй структуру без необхідності  
+4. Зберігай стиль і тон оригіналу
+5. Інтегруй зміни природньо в текст
+6. Використовуй мову: {language}
+
+Поверни ПОВНИЙ оновлений HTML контент (без ```html тегів):
+"""
+        return prompt
+
 
 async def write_article(
     brief: Dict[str, Any],

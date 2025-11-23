@@ -203,8 +203,113 @@ class SEOCoach:
                 "add_more": [],
                 "reduce": []
             },
-            "estimated_time": "20-30 хвилин"
+            'estimated_time': '30-45 хвилин'
         }
+
+    def get_single_action(
+        self,
+        term_details: List[Dict[str, Any]],
+        structure_details: Dict[str, Any],
+        headings_details: Dict[str, Any],
+        guidelines: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get a single prioritized action to improve score.
+        
+        Args:
+            term_details: Term analysis
+            structure_details: Structure analysis
+            headings_details: Headings analysis
+            guidelines: Content guidelines
+            
+        Returns:
+            Single action dict or None
+        """
+        actions = self.prioritize_actions(
+            term_details,
+            structure_details,
+            headings_details,
+            guidelines
+        )
+        return actions[0] if actions else None
+    
+    def prioritize_actions(
+        self,
+        term_details: List[Dict[str, Any]],
+        structure_details: Dict[str, Any],
+        headings_details: Dict[str, Any],
+        guidelines: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """
+        Prioritize all possible actions by impact.
+        
+        Returns:
+            Sorted list of actions (highest priority first)
+        """
+        actions = []
+        
+        # 1. Missing/low terms (highest priority)
+        for term in term_details:
+            if term.get('status') == 'low':
+                needed = term['recommended_min'] - term['current']
+                actions.append({
+                    'type': 'add_term',
+                    'priority': 1,
+                    'impact': needed * 2,
+                    'description': f"Додати термін '{term['term']}' {needed} раз(и)",
+                    'details': f"Зараз: {term['current']}, норма: {term['recommended_min']}-{term['recommended_max']}",
+                    'term': term['term'],
+                    'count': needed
+                })
+        
+        # 2. Over-optimized terms
+        for term in term_details:
+            if term.get('status') == 'high':
+                excess = term['current'] - term['recommended_max']
+                actions.append({
+                    'type': 'reduce_term',
+                    'priority': 2,
+                    'impact': excess * 1.5,
+                    'description': f"Зменшити термін '{term['term']}' на {excess} раз(и)",
+                    'details': f"Зараз: {term['current']}, норма: {term['recommended_min']}-{term['recommended_max']}",
+                    'term': term['term'],
+                    'count': excess
+                })
+        
+        # 3. Missing headings
+        h2_h3_current = headings_details.get('h2_h3_count', {}).get('current', 0)
+        h_min = guidelines.get('headings', {}).get('min', 3)
+        
+        if h2_h3_current < h_min:
+            needed = h_min - h2_h3_current
+            actions.append({
+                'type': 'add_headings',
+                'priority': 3,
+                'impact': needed * 3,
+                'description': f"Додати {needed} заголовк(ів) H2/H3",
+                'details': f"Зараз: {h2_h3_current}, норма: {h_min}+",
+                'count': needed
+            })
+        
+        # 4. Word count
+        wc_current = structure_details.get('word_count', {}).get('current', 0)
+        wc_min = guidelines.get('word_count', {}).get('min', 800)
+        
+        if wc_current < wc_min:
+            needed = wc_min - wc_current
+            actions.append({
+                'type': 'expand_content',
+                'priority': 4,
+                'impact': (needed / 100) * 2,
+                'description': f"Розширити контент на {needed} слів",
+                'details': f"Зараз: {wc_current}, норма: {wc_min}+",
+                'count': needed
+            })
+        
+        # Sort by priority (lower number = higher priority) and impact
+        actions.sort(key=lambda x: (x['priority'], -x['impact']))
+        
+        return actions
 
 
 # Convenience function

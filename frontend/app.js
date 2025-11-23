@@ -751,17 +751,35 @@ function displayCoachingPanel(coaching, currentScore, targetScore) {
 
     coachContent.innerHTML = html;
 
-    // Add "Rewrite" button if we are in AI Writer flow or have a brief
-    if (currentBrief) {
+    // Add "Iterate" button if we have content
+    if (currentBrief || elements.contentEditor?.value) {
         const btnContainer = document.createElement('div');
         btnContainer.style.marginTop = '2rem';
-        btnContainer.style.textAlign = 'center';
+        btnContainer.style.display = 'flex';
+        btnContainer.style.gap = '1rem';
         btnContainer.innerHTML = `
-            <button class="btn btn-primary" onclick="rewriteWithCoach()" style="width: 100%;">
-                <span class="btn-text">🔄 Переписати з рекомендаціями</span>
+            <button class="btn btn-primary" onclick="startIterationFromCoach()" style="flex: 1;">
+                <span class="btn-text">🔄 Покращити ітеративно</span>
+            </button>
+            <button class="btn btn-secondary" onclick="rewriteWithCoach()" style="flex: 1;">
+                <span class="btn-text">⚠️ Переписати (старий)</span>
             </button>
         `;
         coachContent.appendChild(btnContainer);
+
+        // Add explanation
+        const explanation = document.createElement('div');
+        explanation.style.marginTop = '1rem';
+        explanation.style.padding = '1rem';
+        explanation.style.background = 'rgba(59, 130, 246, 0.1)';
+        explanation.style.borderRadius = '0.5rem';
+        explanation.style.fontSize = '0.85rem';
+        explanation.style.color = 'var(--text-secondary)';
+        explanation.innerHTML = `
+            <strong>💡 Рекомендація:</strong> Використовуйте "Покращити ітеративно" - це гарантує покращення score.
+            Старий метод може погіршити результат.
+        `;
+        coachContent.appendChild(explanation);
     }
 }
 
@@ -1019,4 +1037,141 @@ function debounce(func, delay) {
         clearTimeout(timeout);
         timeout = setTimeout(() => func.apply(this, args), delay);
     };
+}
+
+// ===== Iteration Functions =====
+let iterationState = {
+    running: false,
+    currentStep: 0,
+    maxSteps: 5,
+    initialScore: 0,
+    targetScore: 85,
+    iterations: []
+};
+
+async function startIteration(targetScore = 85, maxIterations = 5) {
+    if (!state.currentAnalysisId) {
+        showToast('Спочатку створіть аналіз', 'error');
+        return;
+    }
+
+    const content = elements.contentEditor?.value;
+    if (!content) {
+        showToast('Немає контенту для покращення', 'error');
+        return;
+    }
+
+    iterationState.running = true;
+    iterationState.currentStep = 0;
+    iterationState.maxSteps = maxIterations;
+    iterationState.initialScore = state.currentScore || 0;
+    iterationState.targetScore = targetScore;
+    iterationState.iterations = [];
+
+    const modal = document.getElementById('iterationModal');
+    modal.classList.remove('hidden');
+
+    document.getElementById('iterationScoreTracker').textContent =
+        `${iterationState.initialScore} → ${targetScore}`;
+    document.getElementById('iterationCounter').textContent =
+        `Крок 0/${maxIterations}`;
+    document.getElementById('iterationProgressBar').style.width = '0%';
+    document.getElementById('iterationSteps').innerHTML = '';
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/ai/iterate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                content: content,
+                analysis_id: state.currentAnalysisId,
+                max_iterations: maxIterations,
+                target_score: targetScore
+            })
+        });
+
+        if (!response.ok) throw new Error('Помилка ітерації');
+
+        const result = await response.json();
+        displayIterationResult(result);
+
+    } catch (error) {
+        console.error('Iteration error:', error);
+        showToast('Помилка при покращенні', 'error');
+        closeIterationModal();
+    }
+}
+
+function displayIterationResult(result) {
+    iterationState.running = false;
+    iterationState.iterations = result.iterations || [];
+
+    const stepsContainer = document.getElementById('iterationSteps');
+    stepsContainer.innerHTML = '';
+
+    result.iterations.forEach((iteration) => {
+        const stepDiv = document.createElement('div');
+        stepDiv.className = `iteration-step ${iteration.success ? 'success' : 'failed'}`;
+
+        const scoreDelta = iteration.score_delta;
+        const scoreClass = scoreDelta > 0 ? 'positive' : scoreDelta < 0 ? 'negative' : '';
+        const scoreSign = scoreDelta > 0 ? '+' : '';
+
+        stepDiv.innerHTML = `
+            <div class="step-header">
+                <span class="step-number">Крок ${iteration.step}</span>
+                <span class="step-score ${scoreClass}">
+                    ${iteration.old_score} → ${iteration.new_score} (${scoreSign}${scoreDelta})
+                </span>
+            </div>
+            <div class="step-action">${iteration.action}</div>
+            <div class="step-status">
+                ${iteration.success ? '✅ Застосовано' : '❌ ' + (iteration.reason || 'Відхилено')}
+            </div>
+        `;
+
+        stepsContainer.appendChild(stepDiv);
+    });
+
+    const progress = (result.final_score / result.target_score) * 100;
+    document.getElementById('iterationProgressBar').style.width = `${Math.min(progress, 100)}%`;
+    document.getElementById('iterationScoreTracker').textContent =
+        `${result.initial_score} → ${result.final_score}`;
+    document.getElementById('iterationCounter').textContent =
+        `Завершено: ${result.improvements_made} покращень`;
+
+    if (result.final_score > result.initial_score && result.final_content) {
+        elements.contentEditor.value = result.final_content;
+        handleEditorInput();
+    }
+
+    document.getElementById('stopIterationBtn').classList.add('hidden');
+    document.getElementById('doneIterationBtn').classList.remove('hidden');
+
+    showToast(
+        result.success ?
+            `✅ Ціль досягнуто! ${result.final_score}/${result.target_score}` :
+            `🔄 Покращено: ${result.initial_score} → ${result.final_score}`,
+        result.success ? 'success' : 'info'
+    );
+}
+
+function stopIteration() {
+    iterationState.running = false;
+    showToast('Ітерацію зупинено', 'info');
+    closeIterationModal();
+}
+
+function closeIterationModal() {
+    const modal = document.getElementById('iterationModal');
+    modal.classList.add('hidden');
+    iterationState.running = false;
+    document.getElementById('stopIterationBtn').classList.remove('hidden');
+    document.getElementById('doneIterationBtn').classList.add('hidden');
+}
+
+// Start iteration from Coach panel
+function startIterationFromCoach() {
+    closeCoachPanel();
+    startIteration(85, 5);
 }
