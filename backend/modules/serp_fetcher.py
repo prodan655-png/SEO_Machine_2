@@ -97,12 +97,37 @@ def _fetch_serper_dev(
         
         organic_results = data.get("organic", [])
         
-        # Filter out Russian and Belarusian domains
-        blocked_domains = ['.ru', '.by', '.su']
+        # Filter out Russian and Belarusian sites
+        # Include both TLDs and known Russian domains on .com/.info
+        blocked_domains = ['.ru', '.by', '.su', '.рф']
+        blocked_sites = [
+            'russianfood.com',
+            'say7.info',
+            'vkusnyblog.com',
+            'povar.ru',
+            'eda.ru',
+            'gotovim-doma.ru',
+            'iamcook.ru',
+            'russianfood.com',
+            'koolinar.ru',
+            'nyam.ru'
+        ]
+        
+        def is_blocked(url):
+            url_lower = url.lower()
+            # Check TLDs
+            for domain in blocked_domains:
+                if domain in url_lower:
+                    return True
+            # Check specific sites
+            for site in blocked_sites:
+                if site in url_lower:
+                    return True
+            return False
+        
         filtered_results = [
             result for result in organic_results
-            if not any(result.get('link', '').endswith(domain) or f"{domain}/" in result.get('link', '') 
-                      for domain in blocked_domains)
+            if not is_blocked(result.get('link', ''))
         ]
         
         logger.info(f"Filtered {len(organic_results) - len(filtered_results)} Russian/Belarusian sites from {len(organic_results)} results")

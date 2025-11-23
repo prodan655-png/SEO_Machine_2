@@ -17,7 +17,8 @@ logger = setup_logger(__name__)
 
 def load_stop_words(language: str) -> List[str]:
     """Load stop words for given language."""
-    stop_words_path = Path(__file__).parent.parent / get_config('semantic_analyzer.stop_words_path', 'stop_words')
+    # Go up one level from modules to backend root
+    stop_words_path = Path(__file__).parent.parent / 'stop_words'
     file_path = stop_words_path / f"{language}.txt"
     
     if not file_path.exists():
@@ -89,12 +90,17 @@ def compute_tfidf_terms(
     max_ngram = max(ngrams)
     
     # Create TF-IDF vectorizer
+    # Adjust min_df based on document count to avoid errors
+    min_df_value = min(get_config('semantic_analyzer.min_docs_used_in', 2), len(docs) - 1)
+    min_df_value = max(1, min_df_value)  # At least 1
+    
     vectorizer = TfidfVectorizer(
         ngram_range=(min_ngram, max_ngram),
         stop_words=stop_words,
         max_features=get_config('semantic_analyzer.top_terms_limit', 80) * 2,  # Get more, filter later
         lowercase=True,
-        min_df=get_config('semantic_analyzer.min_docs_used_in', 3),
+        min_df=min_df_value,
+        max_df=0.85,  # Ignore terms in more than 85% of docs
         token_pattern=r'(?u)\b[а-яА-ЯіІїЇєЄґҐa-zA-Z][а-яА-ЯіІїЇєЄґҐa-zA-Z\'-]+\b'
     )
     
@@ -264,7 +270,8 @@ def calculate_term_ranges(
             occurrences.append(count)
         
         # Skip terms that don't appear in enough documents
-        min_docs = get_config('semantic_analyzer.min_docs_used_in', 3)
+        # Adjust threshold based on number of competitors
+        min_docs = min(get_config('semantic_analyzer.min_docs_used_in', 2), max(1, len(competitor_texts) // 2))
         docs_used_in = len([c for c in occurrences if c > 0])
         
         if docs_used_in < min_docs:
@@ -321,13 +328,60 @@ def calculate_term_ranges(
     return results
 
 
+async def analyze_competitors_with_ai(
+    competitors_data: List[Dict[str, Any]],
+    keyword: str,
+    language: str
+) -> List[Dict[str, Any]]:
+    """
+    Analyze competitors using AI-powered term extraction.
+    
+    Args:
+        competitors_data: List of competitor extraction results
+        keyword: Main keyword being analyzed
+        language: Language code
+        
+    Returns:
+        List of terms with recommendations
+    """
+    from modules.ai.term_extractor import extract_terms_with_ai
+    
+    # Filter valid competitors
+    valid_competitors = [c for c in competitors_data if c.get('status') == 'valid']
+    
+    if not valid_competitors:
+        logger.warning("No valid competitors to analyze")
+        return []
+    
+    logger.info(f"Analyzing {len(valid_competitors)} valid competitors with AI")
+    
+    # Extract texts
+    texts = [c['main_text'] for c in valid_competitors]
+    
+    try:
+        # Use AI extraction
+        ai_terms = await extract_terms_with_ai(texts, keyword, language, max_terms=20)
+        
+        if ai_terms:
+            logger.info(f"AI extracted {len(ai_terms)} terms successfully")
+            return ai_terms
+        else:
+            logger.warning("AI extraction returned no terms, falling back to TF-IDF")
+            
+    except Exception as e:
+        logger.error(f"AI extraction failed: {e}, falling back to TF-IDF")
+    
+    # Fallback to TF-IDF if AI fails
+    return analyze_competitors(competitors_data, language, [1.0] * len(valid_competitors))
+
+
 def analyze_competitors(
     competitors_data: List[Dict[str, Any]],
     language: str,
     serp_weights: List[float]
 ) -> List[Dict[str, Any]]:
     """
-    Main function to analyze competitors and extract terms.
+    Main function to analyze competitors and extract terms using TF-IDF.
     
     Args:
         competitors_data: List of competitor extraction results
@@ -344,7 +398,7 @@ def analyze_competitors(
         logger.warning("No valid competitors to analyze")
         return []
     
-    logger.info(f"Analyzing {len(valid_competitors)} valid competitors")
+    logger.info(f"Analyzing {len(valid_competitors)} valid competitors with TF-IDF")
     
     # Extract texts
     texts = [c['main_text'] for c in valid_competitors]

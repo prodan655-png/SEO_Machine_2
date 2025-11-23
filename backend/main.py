@@ -161,9 +161,12 @@ async def process_analysis_task(analysis_id: str):
         
         db.commit()
         
-        # Step 4: Semantic analysis (extract terms)
+        # Step 4: Semantic analysis (extract terms with AI)
         position_weights = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
-        terms_data = analyze_competitors(extracted_data, analysis.language, position_weights)
+        
+        # Use AI-powered term extraction
+        from modules.semantic_analyzer import analyze_competitors_with_ai
+        terms_data = await analyze_competitors_with_ai(extracted_data, analysis.keyword, analysis.language)
         
         # Step 5: Save terms to database
         for term_info in terms_data:

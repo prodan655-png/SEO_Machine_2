@@ -1128,6 +1128,10 @@ async function startIteration(targetScore = 85, maxIterations = 10) {
         if (!response.ok) throw new Error('Помилка ітерації');
 
         const result = await response.json();
+        console.log('✅ Iteration response:', result);
+        console.log('Iterations count:', result.iterations?.length);
+        console.log('Final score:', result.final_score);
+
         displayIterationResult(result);
 
     } catch (error) {
@@ -1138,6 +1142,8 @@ async function startIteration(targetScore = 85, maxIterations = 10) {
 }
 
 function displayIterationResult(result) {
+    console.log('📊 displayIterationResult called with:', result);
+
     iterationState.running = false;
     iterationState.iterations = result.iterations || [];
 

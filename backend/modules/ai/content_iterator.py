@@ -47,6 +47,8 @@ class ContentIterator:
         iterations = []
         current_content = content
         current_total_score = current_score
+        failed_actions = set()  # Track failed action descriptions to avoid retrying
+        consecutive_failures = 0  # Track consecutive failures
         
         for step in range(1, max_iterations + 1):
             logger.info(f"Iteration {step}/{max_iterations}")
@@ -56,17 +58,23 @@ class ContentIterator:
                 logger.info(f"Target score {target_score} reached!")
                 break
             
-            # Get next action
+            # Get next action (skip previously failed ones)
             action = await self._get_next_action(
                 current_content,
                 guidelines,
                 terms,
                 current_total_score,
-                target_score
+                target_score,
+                failed_actions
             )
             
             if not action:
                 logger.warning("No more actions available")
+                break
+            
+            # Stop if too many consecutive failures
+            if consecutive_failures >= 3:
+                logger.warning(f"Stopping after {consecutive_failures} consecutive failures")
                 break
             
             # Apply action
@@ -111,9 +119,12 @@ class ContentIterator:
                 # Accept change
                 current_content = new_content
                 current_total_score = new_score
+                consecutive_failures = 0  # Reset counter
                 logger.info(f"✅ Step {step}: {current_total_score} (+{validation['score_delta']})")
             else:
-                # Reject change (rollback)
+                # Reject change (rollback) and mark action as failed
+                failed_actions.add(action['description'])
+                consecutive_failures += 1
                 logger.warning(f"❌ Step {step} rejected: {validation['reason']}")
                 iteration_result['rolled_back'] = True
             
@@ -135,14 +146,21 @@ class ContentIterator:
         guidelines: Dict[str, Any],
         terms: List[Dict[str, Any]],
         current_score: int,
-        target_score: int
+        target_score: int,
+        failed_actions: set = None
     ) -> Optional[Dict[str, Any]]:
         """
         Determine the next single action to take.
         
+        Args:
+            failed_actions: Set of action descriptions that previously failed
+        
         Returns:
             Dict with action details or None if no action needed
         """
+        if failed_actions is None:
+            failed_actions = set()
+            
         # Re-score to get current breakdown
         score_result = compute_content_score(content, guidelines, terms, 'html')
         breakdown = score_result['breakdown']
@@ -207,10 +225,18 @@ class ContentIterator:
                 'count': needed
             })
         
-        # Sort by priority and impact
-        actions.sort(key=lambda x: (x['priority'], -x['impact']))
+        # Filter out failed actions
+        available_actions = [a for a in actions if a['description'] not in failed_actions]
         
-        return actions[0] if actions else None
+        if not available_actions:
+            logger.warning(f"All {len(actions)} actions have been tried and failed")
+            return None
+        
+        # Sort by priority and impact
+        available_actions.sort(key=lambda x: (x['priority'], -x['impact']))
+        
+        logger.info(f"Next action: {available_actions[0]['description']} (skipped {len(failed_actions)} failed)")
+        return available_actions[0]
     
     async def _apply_action(
         self,
