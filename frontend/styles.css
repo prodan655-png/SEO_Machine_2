@@ -101,8 +101,14 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 2000;
+    z-index: 9999;
     backdrop-filter: blur(4px);
+    display: none;
+    /* Hidden by default */
+}
+
+.iteration-modal.show {
+    display: flex !important;
 }
 
 .iteration-content {
@@ -1230,6 +1236,7 @@ tr:hover {
 .toggle input:checked+.toggle-slider:before {
     transform: translateX(24px);
 }
+
 /* Spinner Animation */
 .spinner {
     width: 40px;
@@ -1241,5 +1248,7 @@ tr:hover {
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }

@@ -98,9 +98,9 @@ def calculate_term_coverage_score(
     over_optimization_multiplier = get_config('scoring.term_coverage.over_optimization_multiplier', 1.5)
     
     for term_dict in terms:
-        term = term_dict['term_normalized']
-        min_rec = term_dict['min_recommended']
-        max_rec = term_dict['max_recommended']
+        term = term_dict.get('term_normalized', term_dict['term'])
+        min_rec = term_dict.get('min_recommended', term_dict.get('recommended_min', 0))
+        max_rec = term_dict.get('max_recommended', term_dict.get('recommended_max', 0))
         
         # Count occurrences
         pattern = re.compile(re.escape(term), re.IGNORECASE)
@@ -180,7 +180,8 @@ def calculate_structure_score(
     # Word count sub-score
     wc = draft_metrics['word_count']
     wc_min = guidelines['word_count']['min']
-    wc_max = guidelines['word_count']['max']
+    wc_min = guidelines['word_count']['min']
+    wc_max = guidelines['word_count'].get('max', guidelines['word_count'].get('optimal', wc_min * 1.5))
     
     if wc >= wc_min and wc <= wc_max:
         wc_score = word_count_weight
@@ -194,7 +195,8 @@ def calculate_structure_score(
     # Images sub-score
     img = draft_metrics['image_count']
     img_min = guidelines['images']['min']
-    img_max = guidelines['images']['max']
+    img_min = guidelines['images']['min']
+    img_max = guidelines['images'].get('max', guidelines['images'].get('optimal', img_min + 2))
     
     if img >= img_min and img <= img_max:
         img_score = images_weight
@@ -272,7 +274,8 @@ def calculate_headings_score(
     h2_h3_count = len(h2_h3_list)
     
     h_min = guidelines['headings']['min']
-    h_max = guidelines['headings']['max']
+    h_min = guidelines['headings']['min']
+    h_max = guidelines['headings'].get('max', guidelines['headings'].get('optimal', h_min + 3))
     
     if h2_h3_count >= h_min and h2_h3_count <= h_max:
         h_count_score = h2_h3_count_weight
@@ -286,7 +289,7 @@ def calculate_headings_score(
     terms_in_headings = 0
     
     for term_dict in terms[:10]:  # Check top 10 terms
-        term = term_dict['term_normalized']
+        term = term_dict.get('term_normalized', term_dict['term'])
         if term in heading_texts:
             terms_in_headings += 1
     

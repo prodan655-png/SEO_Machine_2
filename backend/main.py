@@ -116,7 +116,15 @@ async def process_analysis_task(analysis_id: str):
         logger.info(f"Processing analysis {analysis_id} for keyword '{analysis.keyword}'")
         
         # Step 1: Fetch SERP results
-        serp_data = fetch_serp(analysis.keyword, analysis.language)
+        logger.info(f"Fetching SERP for '{analysis.keyword}' with count=50")
+        serp_data = fetch_serp(
+            analysis.keyword, 
+            analysis.language, 
+            analysis.location, 
+            analysis.device,
+            count=50
+        )
+        logger.info(f"Got {len(serp_data.get('results', []))} results from SERP")
         
         if 'error' in serp_data:
             analysis.status = AnalysisStatus.FAILED
@@ -257,8 +265,9 @@ async def create_analysis(
         
         analysis_id = str(analysis.id)
         
-        # Trigger background task - FastAPI handles async automatically
-        background_tasks.add_task(process_analysis_task, analysis_id)
+        # Trigger background task - use asyncio for async function
+        import asyncio
+        asyncio.create_task(process_analysis_task(analysis_id))
         
         logger.info(f"Created analysis {analysis_id} for keyword '{request.keyword}''")
         
@@ -650,6 +659,7 @@ class ArticleRequest(BaseModel):
     tone: str = "professional"
     language: str = "uk"
     coach_actions: Optional[str] = None
+    internal_links: Optional[list] = None
 
 
 @app.post("/api/ai/generate", tags=["AI"])
@@ -664,11 +674,18 @@ async def generate_article_content(request: ArticleRequest):
     try:
         from modules.ai.content_writer import write_article
         
+        logger.info(f"Generating article for brief: {request.brief.get('title', 'Untitled')}")
+        if request.internal_links:
+            logger.info(f"🔗 Endpoint received {len(request.internal_links)} internal links")
+        else:
+            logger.info("🔗 Endpoint received NO internal links")
+
         article_html = await write_article(
             brief=request.brief,
             tone=request.tone,
             language=request.language,
-            improvement_instructions=request.coach_actions
+            improvement_instructions=request.coach_actions,
+            internal_links=request.internal_links
         )
         
         return {"article": article_html}
@@ -810,6 +827,22 @@ async def general_exception_handler(request, exc):
         content={"error": "Internal server error"}
     )
 
+
+
+class SitemapRequest(BaseModel):
+    url: str
+
+@app.post("/api/tools/sitemap")
+async def parse_sitemap_endpoint(request: SitemapRequest):
+    """Parse a sitemap and return URLs."""
+    from modules.sitemap_parser import parse_sitemap
+    
+    try:
+        urls = parse_sitemap(request.url)
+        return {"urls": urls, "count": len(urls)}
+    except Exception as e:
+        logger.error(f"Sitemap parsing failed: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

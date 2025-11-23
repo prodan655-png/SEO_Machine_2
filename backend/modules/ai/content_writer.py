@@ -21,7 +21,8 @@ class ContentWriter:
         brief: Dict[str, Any],
         tone: str = "professional",
         language: str = "uk",
-        improvement_instructions: Optional[str] = None
+        improvement_instructions: Optional[str] = None,
+        internal_links: Optional[list] = None
     ) -> str:
         """
         Write a full article based on the brief.
@@ -30,12 +31,14 @@ class ContentWriter:
             brief: Structured brief (JSON)
             tone: Content tone
             language: Content language
+            improvement_instructions: Instructions from SEO Coach
+            internal_links: List of available internal links
             
         Returns:
             HTML formatted article
         """
         try:
-            prompt = self._build_prompt(brief, tone, language, improvement_instructions)
+            prompt = self._build_prompt(brief, tone, language, improvement_instructions, internal_links)
             
             # We need a longer response for full articles
             response = await self.ai_client.generate_content(
@@ -66,7 +69,8 @@ class ContentWriter:
         brief: Dict[str, Any],
         tone: str,
         language: str,
-        improvement_instructions: Optional[str] = None
+        improvement_instructions: Optional[str] = None,
+        internal_links: Optional[list] = None
     ) -> str:
         """Build the prompt for writing."""
         
@@ -99,6 +103,22 @@ class ContentWriter:
 - Уникай "води" і загальних фраз.
 - Довжина має відповідати оцінці в брифі.
 """
+        if internal_links:
+            links_str = "\\n".join(internal_links[:50]) # Limit to 50 links to avoid context overflow
+            prompt += f"""
+!!! ВАЖЛИВО: ВНУТРІШНЯ ПЕРЕЛІНКОВКА (ОБОВ'ЯЗКОВО) !!!
+Ось список доступних внутрішніх посилань сайту:
+{links_str}
+
+ТВОЄ ЗАВДАННЯ:
+1. ТИ ЗОБОВ'ЯЗАНИЙ використати мінімум 3 посилання з цього списку.
+2. Пріоритет: органічно вставити в текст статті (в речення).
+3. ЯКЩО неможливо вставити органічно - додай блок "<h3>Рекомендуємо почитати</h3>" в кінці статті і виведи посилання списком.
+4. Використовуй природній анкорний текст.
+5. Формат: <a href="URL">анкорний текст</a>.
+!!! КІНЕЦЬ ІНСТРУКЦІЙ ПЕРЕЛІНКОВКИ !!!
+"""
+
         if improvement_instructions:
             prompt += f"""
 !!! ВАЖЛИВО: ІНСТРУКЦІЇ ДЛЯ ПОКРАЩЕННЯ (SEO COACH) !!!
@@ -111,9 +131,7 @@ class ContentWriter:
 Починай писати одразу HTML код статті:
 """
         
-        logger.info(f"📝 AI PROMPT (Coach Instructions included: {bool(improvement_instructions)})")
-        if improvement_instructions:
-            logger.info(f"Coach Instructions:\n{improvement_instructions}")
+        logger.info(f"📝 AI PROMPT (Coach: {bool(improvement_instructions)}, Links: {bool(internal_links)})")
         
         return prompt
 
@@ -210,8 +228,14 @@ async def write_article(
     brief: Dict[str, Any],
     tone: str = "professional",
     language: str = "uk",
-    improvement_instructions: Optional[str] = None
+    improvement_instructions: Optional[str] = None,
+    internal_links: Optional[list] = None
 ) -> str:
     """Convenience wrapper for ContentWriter."""
+    if internal_links:
+        logger.info(f"🔗 Wrapper received {len(internal_links)} internal links")
+    else:
+        logger.info("🔗 Wrapper received NO internal links")
+        
     writer = ContentWriter()
-    return await writer.write_article(brief, tone, language, improvement_instructions)
+    return await writer.write_article(brief, tone, language, improvement_instructions, internal_links)

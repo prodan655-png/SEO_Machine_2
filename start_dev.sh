@@ -1,35 +1,48 @@
 #!/bin/bash
 
-# Function to kill background processes on exit
-cleanup() {
-    echo "Stopping servers..."
-    kill $BACKEND_PID
-    kill $FRONTEND_PID
-    exit
-}
+# Startup script for SEO Machine development environment
 
-# Trap SIGINT (Ctrl+C)
-trap cleanup SIGINT
+echo "🚀 Starting SEO Machine Development Environment..."
 
-# Start Backend
-echo "Starting Backend on port 8000..."
-cd backend
-ENV=development uvicorn main:app --reload --port 8000 &
+# Check if we're in the right directory
+if [ ! -f "backend/main.py" ]; then
+    echo "❌ Error: Please run this script from the SEO_Machine_2 root directory"
+    exit 1
+fi
+
+# Kill any existing processes
+echo "🧹 Cleaning up existing processes..."
+pkill -f "uvicorn main:app" 2>/dev/null || true
+pkill -f "python3 -m http.server" 2>/dev/null || true
+sleep 1
+
+# Start backend in new terminal tab
+echo "🔧 Starting Backend..."
+cd backend && ENV=development python3 -m uvicorn main:app --reload --port 8000 &
 BACKEND_PID=$!
 
-# Wait a bit for backend to start
-sleep 2
+# Wait for backend to start
+sleep 3
 
-# Start Frontend
-echo "Starting Frontend on port 8080..."
-cd ../frontend
-python3 -m http.server 8080 &
+# Start frontend in background
+echo "🎨 Starting Frontend..."
+cd frontend && python3 -m http.server 8080 &
 FRONTEND_PID=$!
 
-echo "✅ Application started!"
-echo "Backend: http://localhost:8000"
-echo "Frontend: http://localhost:8080"
-echo "Press Ctrl+C to stop both servers."
+echo ""
+echo "✅ Development environment started!"
+echo ""
+echo "📍 URLs:"
+echo "   Frontend: http://localhost:8080"
+echo "   Backend:  http://localhost:8000"
+echo "   API Docs: http://localhost:8000/docs"
+echo ""
+echo "📝 Logs:"
+echo "   Backend PID: $BACKEND_PID"
+echo "   Frontend PID: $FRONTEND_PID"
+echo ""
+echo "🛑 To stop: pkill -f uvicorn && pkill -f http.server"
+echo ""
 
-# Keep script running
+# Wait for processes
 wait

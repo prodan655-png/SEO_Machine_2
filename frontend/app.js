@@ -7,8 +7,10 @@ const SCORE_DEBOUNCE = 500; // 0.5 seconds
 const state = {
     currentAnalysisId: null,
     analysisData: null,
+    analysisData: null,
     pollingInterval: null,
-    scoreTimeout: null
+    scoreTimeout: null,
+    sitemapLinks: []
 };
 
 // ===== DOM Elements =====
@@ -751,63 +753,48 @@ function displayCoachingPanel(coaching, currentScore, targetScore) {
 
     coachContent.innerHTML = html;
 
-    // Add "Iterate" button if we have content
-    if (currentBrief || elements.contentEditor?.value) {
-        const btnContainer = document.createElement('div');
-        btnContainer.style.marginTop = '2rem';
-        btnContainer.style.display = 'flex';
-        btnContainer.style.gap = '1rem';
-        btnContainer.innerHTML = `
-            <button class="btn btn-primary" onclick="startIterationFromCoach()" style="flex: 1;">
-                <span class="btn-text">🔄 Покращити ітеративно</span>
-            </button>
-            <button class="btn btn-secondary" onclick="rewriteWithCoach()" style="flex: 1;">
-                <span class="btn-text">⚠️ Переписати (старий)</span>
-            </button>
-        `;
-        coachContent.appendChild(btnContainer);
+    // Add "Iterate" button (Always show if we have a score)
+    const btnContainer = document.createElement('div');
+    btnContainer.style.marginTop = '2rem';
+    btnContainer.style.display = 'flex';
+    btnContainer.style.gap = '1rem';
+    btnContainer.innerHTML = `
+        <button class="btn btn-primary" onclick="startIterationFromCoach()" style="flex: 1;">
+            <span class="btn-text">🔄 Покрокове покращення</span>
+        </button>
+        <button class="btn btn-secondary" onclick="rewriteWithCoach()" style="flex: 1;">
+            <span class="btn-text">⚠️ Переписати (старий)</span>
+        </button>
+    `;
+    coachContent.appendChild(btnContainer);
 
-        // Add explanation
-        const explanation = document.createElement('div');
-        explanation.style.marginTop = '1rem';
-        explanation.style.padding = '1rem';
-        explanation.style.background = 'rgba(59, 130, 246, 0.1)';
-        explanation.style.borderRadius = '0.5rem';
-        explanation.style.fontSize = '0.85rem';
-        explanation.style.color = 'var(--text-secondary)';
-        explanation.innerHTML = `
-            <strong>💡 Рекомендація:</strong> Використовуйте "Покращити ітеративно" - це гарантує покращення score.
-            Старий метод може погіршити результат.
-        `;
-        coachContent.appendChild(explanation);
-    }
+    // Add explanation
+    const explanation = document.createElement('div');
+    explanation.style.marginTop = '1rem';
+    explanation.style.padding = '1rem';
+    explanation.style.background = 'rgba(59, 130, 246, 0.1)';
+    explanation.style.borderRadius = '0.5rem';
+    explanation.style.fontSize = '0.85rem';
+    explanation.style.color = 'var(--text-secondary)';
+    explanation.innerHTML = `
+        <strong>💡 Рекомендація:</strong> Використовуйте "Покрокове покращення" - це гарантує підвищення оцінки.
+    `;
+    coachContent.appendChild(explanation);
 }
 
 function rewriteWithCoach() {
+    // UX Improvement: Instead of a blind rewrite, we use the Iterative System
+    // which shows progress and guarantees score improvement.
+
     // 1. Close coach panel
     closeCoachPanel();
 
-    // 2. Switch to AI Writer tab
+    // 2. Switch to AI Writer tab (where the iteration modal lives)
     switchTab('ai-writer');
 
-    // 3. Reset to Step 2 (Brief) if we are in Step 3, to allow regeneration
-    document.getElementById('aiStep3').classList.add('hidden');
-    document.getElementById('aiStep2').classList.remove('hidden');
-
-    // 4. Check the "Use Coach" checkbox
-    if (elements.useCoachCheckbox) {
-        elements.useCoachCheckbox.checked = true;
-    }
-
-    // 5. Scroll to generate button
-    const generateBtn = document.querySelector('#aiStep2 .btn-primary');
-    if (generateBtn) {
-        generateBtn.scrollIntoView({ behavior: 'smooth' });
-
-        // Auto-trigger generation
-        showToast('🔄 Покращуємо статтю...', 'info');
-        generateArticle();
-    }
+    // 3. Start Iteration immediately
+    showToast('🔄 Запускаю покрокове покращення...', 'info');
+    startIteration(85, 10);
 }
 
 function closeCoachPanel() {
@@ -927,7 +914,8 @@ async function generateArticle() {
                 brief: currentBrief,
                 tone: 'professional',
                 language: document.getElementById('language').value,
-                coach_actions: coachActions
+                coach_actions: coachActions,
+                internal_links: state.sitemapLinks || []
             })
         });
 
@@ -1092,10 +1080,8 @@ async function startIteration(targetScore = 85, maxIterations = 10) {
     }
 
     modal.classList.remove('hidden');
-    modal.style.display = 'flex';  // Force display
-    modal.style.zIndex = '9999';   // Ensure it's on top
-    console.log('Modal classes after remove hidden:', modal.className);
-    console.log('Modal computed style:', window.getComputedStyle(modal).display);
+    modal.classList.add('show');
+    console.log('Modal classes:', modal.className);
 
     document.getElementById('iterationScoreTracker').textContent =
         `${iterationState.initialScore} → ${targetScore}`;
@@ -1215,4 +1201,58 @@ function closeIterationModal() {
 function startIterationFromCoach() {
     closeCoachPanel();
     startIteration(85, 10);  // Increased to 10 iterations
+}
+
+// ===== Sitemap Functions =====
+async function fetchSitemap() {
+    const urlInput = document.getElementById('sitemapUrl');
+    const url = urlInput.value.trim();
+    const btn = document.getElementById('fetchSitemapBtn');
+    const statusDiv = document.getElementById('sitemapStatus');
+
+    if (!url) {
+        showToast('Введіть URL Sitemap', 'error');
+        return;
+    }
+
+    // UI Loading state
+    const btnText = btn.querySelector('.btn-text');
+    const btnLoader = btn.querySelector('.btn-loader');
+    btnText.classList.add('hidden');
+    btnLoader.classList.remove('hidden');
+    btn.disabled = true;
+    statusDiv.classList.add('hidden');
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/tools/sitemap`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Помилка сканування');
+        }
+
+        const data = await response.json();
+        state.sitemapLinks = data.urls;
+
+        statusDiv.textContent = `✅ Знайдено ${data.count} посилань`;
+        statusDiv.className = 'status-message success';
+        statusDiv.classList.remove('hidden');
+
+        showToast(`Успішно завантажено ${data.count} посилань`, 'success');
+
+    } catch (error) {
+        console.error('Sitemap error:', error);
+        statusDiv.textContent = `❌ Помилка: ${error.message}`;
+        statusDiv.className = 'status-message error';
+        statusDiv.classList.remove('hidden');
+        showToast(error.message, 'error');
+    } finally {
+        btnText.classList.remove('hidden');
+        btnLoader.classList.add('hidden');
+        btn.disabled = false;
+    }
 }

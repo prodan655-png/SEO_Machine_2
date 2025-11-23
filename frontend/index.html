@@ -315,6 +315,25 @@
                         <h2>🤖 AI Content Writer</h2>
                         <p class="card-description">Згенеруйте оптимізовану статтю на основі аналізу конкурентів</p>
 
+                        <!-- Sitemap Settings -->
+                        <div class="card-section"
+                            style="margin-bottom: 2rem; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                            <h4 style="margin-top: 0;">🔗 Внутрішня перелінковка</h4>
+                            <div class="form-row" style="display: flex; gap: 1rem; align-items: flex-end;">
+                                <div class="form-group" style="flex: 1;">
+                                    <label for="sitemapUrl">URL Sitemap (XML)</label>
+                                    <input type="url" id="sitemapUrl" placeholder="https://site.com/sitemap.xml">
+                                </div>
+                                <button class="btn btn-secondary" onclick="fetchSitemap()" id="fetchSitemapBtn"
+                                    style="margin-bottom: 1rem;">
+                                    <span class="btn-text">Сканувати</span>
+                                    <span class="btn-loader hidden"><span class="spinner"></span></span>
+                                </button>
+                            </div>
+                            <div id="sitemapStatus" class="status-message hidden"
+                                style="margin-top: 0.5rem; font-size: 0.9rem;"></div>
+                        </div>
+
                         <!-- Step 1: Generate Brief -->
                         <div id="aiStep1" class="ai-step">
                             <div class="step-header">
