@@ -51,7 +51,92 @@ def fetch_serp(
         return mock_fetch_serp(keyword, language, location, device, count)
     
     # Real implementation
-    return _fetch_serp_real(keyword, language, location, device, count)
+    from config import SERP_PROVIDER
+    
+    if SERP_PROVIDER == 'serper':
+        return _fetch_serper_dev(keyword, language, location, device, count)
+    else:
+        return _fetch_serp_real(keyword, language, location, device, count)
+
+
+def _fetch_serper_dev(
+    keyword: str,
+    language: str,
+    location: str,
+    device: str,
+    count: int
+) -> Dict[str, Any]:
+    """
+    Fetch SERP results using Serper.dev API.
+    """
+    import requests
+    import json
+    from config import get_config
+    
+    logger.info(f"Fetching SERP (Serper.dev) for '{keyword}' ({language}, {location}, {device})")
+    
+    url = "https://google.serper.dev/search"
+    
+    payload = json.dumps({
+        "q": keyword,
+        "gl": language[:2],
+        "hl": language,
+        "location": location,
+        "num": count
+    })
+    
+    headers = {
+        'X-API-KEY': SERPAPI_KEY,
+        'Content-Type': 'application/json'
+    }
+    
+    try:
+        response = requests.request("POST", url, headers=headers, data=payload)
+        response.raise_for_status()
+        data = response.json()
+        
+        organic_results = data.get("organic", [])
+        
+        if not organic_results:
+            raise NoSerpResultsError(f"No SERP results for keyword '{keyword}'")
+            
+        results = []
+        domains_seen = set()
+        
+        for idx, result in enumerate(organic_results[:count]):
+            url = result.get("link")
+            domain = _extract_domain(url)
+            domains_seen.add(domain)
+            
+            results.append({
+                "position": result.get("position", idx + 1),
+                "url": url,
+                "title": result.get("title", ""),
+                "snippet": result.get("snippet", ""),
+                "domain": domain
+            })
+            
+        logger.info(f"✓ Fetched {len(results)} SERP results via Serper.dev")
+        
+        return {
+            "success": True,
+            "results": results,
+            "metadata": {
+                "total_results": len(results),
+                "unique_domains": len(domains_seen),
+                "query_time": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "mock": False,
+                "provider": "serper"
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Serper.dev request failed: {str(e)}")
+        if "401" in str(e) or "403" in str(e):
+            logger.warning("Invalid API key. Falling back to MOCK SERP.")
+            from modules.mocks.serp_mock import mock_fetch_serp
+            return mock_fetch_serp(keyword, language, location, device, count)
+        raise SerpAPIError(f"Serper.dev error: {str(e)}")
 
 
 def _fetch_serp_real(
@@ -67,7 +152,7 @@ def _fetch_serp_real(
     import requests
     from config import get_config
     
-    logger.info(f"Fetching SERP for '{keyword}' ({language}, {location}, {device})")
+    logger.info(f"Fetching SERP (SerpApi) for '{keyword}' ({language}, {location}, {device})")
     
     # SerpAPI parameters
     params = {
@@ -134,7 +219,8 @@ def _fetch_serp_real(
                     "total_results": len(results),
                     "unique_domains": len(domains_seen),
                     "query_time": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "mock": False
+                    "mock": False,
+                    "provider": "serpapi"
                 }
             }
             
@@ -147,10 +233,17 @@ def _fetch_serp_real(
         
         except requests.exceptions.RequestException as e:
             logger.error(f"SERP API request failed: {str(e)}")
+            if "401" in str(e) or "403" in str(e):
+                logger.warning("Invalid API key or unauthorized. Falling back to MOCK SERP.")
+                from modules.mocks.serp_mock import mock_fetch_serp
+                return mock_fetch_serp(keyword, language, location, device, count)
+            
             if attempt < max_retries - 1:
                 time.sleep(retry_delay)
             else:
-                raise SerpAPIError(f"SERP API error: {str(e)}")
+                logger.error("All retries failed. Falling back to MOCK SERP.")
+                from modules.mocks.serp_mock import mock_fetch_serp
+                return mock_fetch_serp(keyword, language, location, device, count)
 
 
 def _extract_domain(url: str) -> str:

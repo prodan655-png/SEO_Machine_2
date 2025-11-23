@@ -19,6 +19,7 @@ content_extraction:
 
 # Semantic Analysis
 semantic_analyzer:
+  enable_nlp: false  # Set to false to disable spaCy (fixes Python 3.12 compatibility)
   top_terms_limit: 80  # Maximum number of terms to extract
   min_docs_used_in: 3  # Term must appear in at least N competitors
   ngrams: [1, 2, 3]  # Unigrams, bigrams, trigrams
@@ -79,3 +80,19 @@ security:
   min_keyword_length: 2
   max_keyword_length: 100
   allowed_html_tags: ["h1", "h2", "h3", "p", "strong", "em", "ul", "ol", "li", "br"]
+
+# AI Features (Phase 6)
+ai:
+  enabled: false  # Set to true when ready
+  provider: gemini
+  model: gemini-2.0-flash
+  gemini_api_key: ${GEMINI_API_KEY:}
+  temperature: 0.7  # 0.0 = deterministic, 1.0 = creative
+  max_tokens: 2000
+  timeout: 30
+  retry_attempts: 3
+  features:
+    seo_coaching: true
+    brief_generation: false  # Phase 6.2
+    meta_tags: false  # Phase 6.3
+    content_enhancement: false  # Phase 6.4

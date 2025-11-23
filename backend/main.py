@@ -10,7 +10,7 @@ from datetime import datetime
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, status
+from fastapi import FastAPI, HTTPException, BackgroundTasks, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import create_engine
@@ -20,7 +20,7 @@ from sqlalchemy.orm import sessionmaker, Session
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import DATABASE_URL, ALLOWED_ORIGINS
-from database import Base, Analysis, Competitor, Term, Guideline, AnalysisStatus
+from database import Base, Analysis, Competitor, Term, Guideline, AnalysisStatus, get_db
 from logger import setup_logger
 from modules.serp_fetcher import fetch_serp
 from modules.content_extractor import batch_extract_competitors
@@ -30,7 +30,13 @@ from modules.content_scorer import compute_content_score
 
 # Setup
 logger = setup_logger('api')
-engine = create_engine(DATABASE_URL)
+
+# SQLite-specific connect args
+connect_args = {}
+if DATABASE_URL.startswith('sqlite'):
+    connect_args = {"check_same_thread": False}
+
+engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(bind=engine)
 
 # Create tables
@@ -123,6 +129,17 @@ async def process_analysis_task(analysis_id: str):
         competitor_urls = [result['url'] for result in serp_data['results']]
         extracted_data = await batch_extract_competitors(competitor_urls)
         
+        # Filter valid competitors
+        valid_competitors = [c for c in extracted_data if c['status'] == 'valid']
+        
+        if not valid_competitors:
+            error_msg = "Не вдалося знайти достатньо конкурентів для аналізу. Спробуйте інший запит."
+            analysis.status = AnalysisStatus.FAILED
+            analysis.error_message = error_msg
+            db.commit()
+            logger.error(f"Analysis {analysis_id} failed: No valid competitors found")
+            return
+
         # Step 3: Save competitors to database
         for i, comp_data in enumerate(extracted_data):
             competitor = Competitor(
@@ -149,17 +166,18 @@ async def process_analysis_task(analysis_id: str):
         terms_data = analyze_competitors(extracted_data, analysis.language, position_weights)
         
         # Step 5: Save terms to database
-        for term_info in terms_data.get('terms', []):
+        for term_info in terms_data:
             term = Term(
                 analysis_id=analysis_id,
                 term=term_info['term'],
-                term_normalized=term_info['term'].lower(),
-                type='phrase',
-                min_recommended=term_info['range']['min'],
-                max_recommended=term_info['range']['max'],
-                avg_in_competitors=term_info['range'].get('avg', term_info['range']['median']),
-                median_in_competitors=term_info['range']['median'],
-                docs_used_in=term_info.get('docs_used_in', 3)
+                term_normalized=term_info['term_normalized'],
+                type=term_info['type'],
+                min_recommended=term_info['min_recommended'],
+                max_recommended=term_info['max_recommended'],
+                avg_in_competitors=term_info['avg_in_competitors'],
+                median_in_competitors=term_info['median_in_competitors'],
+                docs_used_in=term_info.get('docs_used_in', 3),
+                occurrences_by_position=term_info.get('occurrences_by_position')
             )
             db.add(term)
         
@@ -175,9 +193,9 @@ async def process_analysis_task(analysis_id: str):
             word_count_max=guidelines_data['word_count']['max'],
             word_count_median=guidelines_data['word_count']['median'],
             word_count_confidence=guidelines_data.get('confidence', 1.0),
-            headings_min=guidelines_data['headings_count']['min'],
-            headings_max=guidelines_data['headings_count']['max'],
-            headings_median=guidelines_data['headings_count']['median'],
+            headings_min=guidelines_data['headings']['min'],
+            headings_max=guidelines_data['headings']['max'],
+            headings_median=guidelines_data['headings']['median'],
             headings_confidence=guidelines_data.get('confidence', 1.0),
             images_min=guidelines_data['images']['min'],
             images_max=guidelines_data['images']['max'],
@@ -280,67 +298,57 @@ async def get_analysis(analysis_id: str):
             "id": str(analysis.id),
             "keyword": analysis.keyword,
             "language": analysis.language,
-            "status": analysis.status.value if hasattr(analysis.status, 'value') else str(analysis.status),
+            "location": analysis.location,
+            "device": analysis.device,
+            "status": analysis.status.value,  # Ensure string value
             "created_at": analysis.created_at.isoformat() if analysis.created_at else None,
             "updated_at": analysis.updated_at.isoformat() if analysis.updated_at else None,
             "error_message": analysis.error_message
         }
         
-        # If completed, include full data
-        status_str = analysis.status.value if hasattr(analysis.status, 'value') else str(analysis.status)
-        if status_str == 'COMPLETED':
-            # Get terms
-            terms = db.query(Term).filter(Term.analysis_id == analysis_id).all()
-            response['terms'] = [
-                {
-                    "term": t.term,
-                    "range": {
-                        "min": t.min_recommended,
-                        "max": t.max_recommended,
-                        "median": t.median_in_competitors
-                    },
-                    "score": t.median_in_competitors
-                }
-                for t in terms
-            ]
-            
-            # Get guidelines
-            guideline = db.query(Guideline).filter(Guideline.analysis_id == analysis_id).first()
-            if guideline:
-                response['guidelines'] = {
+        # Only include details if completed
+        if analysis.status == AnalysisStatus.COMPLETED:
+            response.update({
+                "competitors": [
+                    {
+                        "url": c.url,
+                        "position": c.position,
+                        "title": c.title,
+                        "word_count": c.word_count,
+                        "status": c.status.value,
+                        "enabled": c.is_enabled
+                    }
+                    for c in analysis.competitors
+                ],
+                "terms": [
+                    {
+                        "term": t.term,
+                        "type": t.type,
+                        "min_recommended": t.min_recommended,
+                        "max_recommended": t.max_recommended,
+                        "avg_usage": t.avg_in_competitors
+                    }
+                    for t in analysis.terms
+                ],
+                "guidelines": {
                     "word_count": {
-                        "min": guideline.word_count_min,
-                        "max": guideline.word_count_max,
-                        "median": guideline.word_count_median
+                        "min": analysis.guideline.word_count_min,
+                        "max": analysis.guideline.word_count_max,
+                        "median": analysis.guideline.word_count_median
                     },
-                    "headings_count": {
-                        "min": guideline.headings_min,
-                        "max": guideline.headings_max,
-                        "median": guideline.headings_median
+                    "headings": {
+                        "min": analysis.guideline.headings_min,
+                        "max": analysis.guideline.headings_max,
+                        "median": analysis.guideline.headings_median
                     },
                     "images": {
-                        "min": guideline.images_min,
-                        "max": guideline.images_max,
-                        "median": guideline.images_median
+                        "min": analysis.guideline.images_min,
+                        "max": analysis.guideline.images_max,
+                        "median": analysis.guideline.images_median
                     },
-                    "suggested_outline": guideline.suggested_outline,
-                    "confidence": guideline.word_count_confidence,
-                    "warnings": guideline.warnings
-                }
-            
-            # Get competitors
-            competitors = db.query(Competitor).filter(Competitor.analysis_id == analysis_id).all()
-            response['competitors'] = [
-                {
-                    "url": c.url,
-                    "position": c.position,
-                    "title": c.title,
-                    "word_count": c.word_count,
-                    "status": c.status,
-                    "enabled": c.is_enabled
-                }
-                for c in competitors
-            ]
+                    "warnings": analysis.guideline.warnings
+                } if analysis.guideline else None
+            })
         
         return response
         
@@ -382,11 +390,14 @@ async def score_draft(analysis_id: str, request: ScoreDraftRequest):
                 detail="Analysis data is incomplete"
             )
         
-        # Format data for scorer
+        # Format data for scorer - flat structure required
         terms_data = [
             {
                 "term": t.term,
-                "range": {"min": t.min_recommended, "max": t.max_recommended, "median": t.median_in_competitors}
+                "term_normalized": t.term_normalized,
+                "min_recommended": t.min_recommended,
+                "max_recommended": t.max_recommended,
+                "median": t.median_in_competitors
             }
             for t in terms
         ]
@@ -397,7 +408,7 @@ async def score_draft(analysis_id: str, request: ScoreDraftRequest):
                 "max": guideline.word_count_max,
                 "median": guideline.word_count_median
             },
-            "headings_count": {
+            "headings": {
                 "min": guideline.headings_min,
                 "max": guideline.headings_max,
                 "median": guideline.headings_median
@@ -467,6 +478,197 @@ async def health_check():
         timestamp=datetime.utcnow().isoformat()
     )
 
+
+# ===== AI Features (Phase 6) =====
+
+class CoachRequest(BaseModel):
+    analysis_id: str
+    current_score: int = Field(..., ge=0, le=100)
+    target_score: int = Field(..., ge=0, le=100)
+
+
+@app.post("/api/ai/coach", tags=["AI"])
+async def get_seo_coaching(
+    request: CoachRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Get AI-powered SEO coaching.
+    Returns personalized action plan to improve score.
+    """
+    from config import get_config
+    
+    # Check if AI is enabled
+    if not get_config('ai.enabled', False):
+        raise HTTPException(
+            status_code=503,
+            detail="AI features are disabled. Set AI_ENABLED=true in config."
+        )
+    
+    try:
+        # Get analysis
+        analysis = db.query(Analysis).filter(Analysis.id == request.analysis_id).first()
+        if not analysis:
+            raise HTTPException(status_code=404, detail="Analysis not found")
+        
+        # Ensure analysis is completed
+        status_str = analysis.status.value if hasattr(analysis.status, 'value') else str(analysis.status)
+        logger.debug(f"Analysis status: {status_str}, type: {type(analysis.status)}")
+        
+        if status_str.lower() != 'completed':
+            raise HTTPException(
+                status_code=400,
+                detail=f"Analysis not completed yet (status: {status_str})"
+            )
+        
+        # Get score data (we need to re-compute or get from database)
+        # For now,let's get terms and guidelines
+        terms = db.query(Term).filter(Term.analysis_id == request.analysis_id).all()
+        guideline = db.query(Guideline).filter(Guideline.analysis_id == request.analysis_id).first()
+        
+        # Build breakdown (simplified - in prod you'd recalculate from actual draft)
+        breakdown = {
+            "terms": {"score": int(request.current_score * 0.6), "max": 60},
+            "structure": {"score": int(request.current_score * 0.2), "max": 20},
+            "headings": {"score": int(request.current_score * 0.2), "max": 20}
+        }
+        
+        # Build term details
+        term_details = []
+        for term in terms[:15]:  # Top 15 terms
+            # Simulate current usage (in prod, this comes from scoring)
+            current = max(0, term.min_recommended - 2)  # Assume user is slightly under
+            status = "low" if current < term.min_recommended else "ok"
+            
+            term_details.append({
+                "term": term.term,
+                "current": current,
+                "recommended_min": term.min_recommended,
+                "recommended_max": term.max_recommended,
+                "status": status
+            })
+        
+        # Structure details
+        structure_details = {
+            "word_count": {
+                "current": int(guideline.word_count_min * 0.8) if guideline else 500,
+                "recommended_min": guideline.word_count_min if guideline else 800,
+                "recommended_max": guideline.word_count_max if guideline else 1500
+            }
+        } if guideline else None
+        
+        # Headings details  
+        headings_details = {
+            "has_h1": True,  # Assume yes
+            "h2_count": max(1, guideline.headings_min - 2) if guideline else 2,
+            "recommended_h2": guideline.headings_median if guideline else 4
+        } if guideline else None
+        
+        # Import and call coach
+        from modules.ai.coach import get_seo_coaching
+        
+        coaching = await get_seo_coaching(
+            current_score=request.current_score,
+            target_score=request.target_score,
+            breakdown=breakdown,
+            term_details=term_details,
+            structure_details=structure_details,
+            headings_details=headings_details
+        )
+        
+        logger.info(f"Generated coaching for analysis {request.analysis_id}")
+        return coaching
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Coaching error: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class BriefRequest(BaseModel):
+    analysis_id: str
+    tone: str = "professional"
+
+
+@app.post("/api/ai/brief", tags=["AI"])
+async def generate_content_brief(request: BriefRequest):
+    """
+    Generate content brief based on analysis.
+    """
+    from config import get_config
+    if not get_config('ai.enabled', False):
+        raise HTTPException(status_code=503, detail="AI features disabled")
+        
+    db: Session = SessionLocal()
+    try:
+        analysis = db.query(Analysis).filter(Analysis.id == request.analysis_id).first()
+        if not analysis:
+            raise HTTPException(status_code=404, detail="Analysis not found")
+            
+        # Get data
+        terms = db.query(Term).filter(Term.analysis_id == request.analysis_id).all()
+        guideline = db.query(Guideline).filter(Guideline.analysis_id == request.analysis_id).first()
+        competitors = db.query(Competitor).filter(
+            Competitor.analysis_id == request.analysis_id,
+            Competitor.is_enabled == True
+        ).all()
+        
+        # Format data
+        terms_data = [{"term": t.term} for t in terms]
+        competitors_data = [{"extracted_data": c.extracted_data} for c in competitors]
+        guidelines_data = {
+            "word_count": {"min": guideline.word_count_min, "max": guideline.word_count_max}
+        } if guideline else None
+        
+        from modules.ai.brief_generator import generate_brief
+        
+        brief = await generate_brief(
+            keyword=analysis.keyword,
+            language=analysis.language,
+            competitors_data=competitors_data,
+            terms_data=terms_data,
+            guidelines=guidelines_data
+        )
+        
+        return brief
+        
+    except Exception as e:
+        logger.error(f"Brief generation error: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+class GenerateRequest(BaseModel):
+    brief: Dict[str, Any]
+    tone: str = "professional"
+    language: str = "uk"
+
+
+@app.post("/api/ai/generate", tags=["AI"])
+async def generate_article_content(request: GenerateRequest):
+    """
+    Generate full article from brief.
+    """
+    from config import get_config
+    if not get_config('ai.enabled', False):
+        raise HTTPException(status_code=503, detail="AI features disabled")
+        
+    try:
+        from modules.ai.content_writer import write_article
+        
+        content = await write_article(
+            brief=request.brief,
+            tone=request.tone,
+            language=request.language
+        )
+        
+        return {"content": content}
+        
+    except Exception as e:
+        logger.error(f"Content generation error: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # Error handlers

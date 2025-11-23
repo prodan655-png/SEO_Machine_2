@@ -134,6 +134,11 @@ def extract_nlp_entities(
     Returns:
         List of (entity, salience) tuples
     """
+    nlp_enabled = get_config('semantic_analyzer.enable_nlp', True)
+    if not nlp_enabled:
+        logger.info("NLP entity extraction disabled in config")
+        return []
+
     nlp = get_language_pipeline(language)
     
     if not nlp:

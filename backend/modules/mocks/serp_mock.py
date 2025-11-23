@@ -42,7 +42,7 @@ def mock_fetch_serp(
     for i in range(min(count, len(domains))):
         results.append({
             "position": i + 1,
-            "url": f"https://{domains[i]}/article/{keyword.replace(' ', '-').lower()}",
+            "url": f"mock://{domains[i]}/article/{keyword.replace(' ', '-').lower()}",
             "title": f"{keyword.title()}: Complete Guide from {domains[i].split('.')[0].title()}",
             "snippet": f"Learn everything about {keyword}. Discover benefits, risks, and practical tips from experts...",
             "domain": domains[i]
@@ -59,7 +59,7 @@ def mock_fetch_serp(
         }
     }
     
-    logger.info(f"[MOCK] Returned {len(results)} SERP results")
+    logger.info(f"[MOCK] Returned {len(results)} SERP results with mock:// URLs")
     return response
 
 

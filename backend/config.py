@@ -18,8 +18,9 @@ env_file = f'.env.{ENV}' if ENV in ['development', 'production'] else '.env'
 env_path = Path(__file__).parent.parent / env_file
 
 if env_path.exists():
-    load_dotenv(env_path)
+    load_dotenv(env_path, override=True)
     print(f"✓ Loaded environment from {env_file}")
+    print(f"DEBUG: USE_MOCK_SERP = {os.getenv('USE_MOCK_SERP')}")
 else:
     print(f"⚠ Warning: {env_file} not found, using system environment variables")
 
@@ -48,6 +49,7 @@ DATABASE_URL = get_env_var('DATABASE_URL', required=True)
 
 # SERP API
 USE_MOCK_SERP = get_env_var('USE_MOCK_SERP', default='false').lower() == 'true'
+SERP_PROVIDER = get_env_var('SERP_PROVIDER', default='serpapi')
 SERPAPI_KEY = get_env_var('SERPAPI_KEY', required=not USE_MOCK_SERP)
 
 # AI Configuration
@@ -63,7 +65,16 @@ ALLOWED_ORIGINS = get_env_var('ALLOWED_ORIGINS', default='http://localhost:8080'
 ADMIN_TOKEN = get_env_var('ADMIN_TOKEN')
 
 # Rate Limiting
+# Rate Limiting
 RATE_LIMIT_ENABLED = get_env_var('RATE_LIMIT_ENABLED', default='false').lower() == 'true'
+
+
+# Update CONFIG with environment variables
+if 'ai' not in CONFIG:
+    CONFIG['ai'] = {}
+CONFIG['ai']['enabled'] = AI_ENABLED
+CONFIG['ai']['provider'] = AI_PROVIDER
+CONFIG['ai']['gemini_api_key'] = GEMINI_API_KEY
 
 
 # Helper functions to access nested config

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="uk">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,6 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
+
 <body>
     <!-- Header -->
     <header class="header">
@@ -44,6 +46,10 @@
                     <span class="tab-icon">✍️</span>
                     Оцінка Контенту
                 </button>
+                <button class="tab-btn" data-tab="ai-writer" id="aiWriterTab" disabled>
+                    <span class="tab-icon">🤖</span>
+                    AI Writer
+                </button>
             </nav>
 
             <!-- Tab Content -->
@@ -53,19 +59,12 @@
                     <div class="card">
                         <h2>Створити новий аналіз</h2>
                         <p class="card-description">Введіть ключове слово для аналізу TOP-10 результатів пошуку</p>
-                        
+
                         <form id="analysisForm" class="form">
                             <div class="form-group">
                                 <label for="keyword">Ключове слово *</label>
-                                <input 
-                                    type="text" 
-                                    id="keyword" 
-                                    name="keyword" 
-                                    placeholder="напр. seo оптимізація"
-                                    required
-                                    minlength="2"
-                                    maxlength="100"
-                                >
+                                <input type="text" id="keyword" name="keyword" placeholder="напр. seo оптимізація"
+                                    required minlength="2" maxlength="100">
                             </div>
 
                             <div class="form-row">
@@ -79,18 +78,12 @@
 
                                 <div class="form-group">
                                     <label for="location">Локація</label>
-                                    <input 
-                                        type="text" 
-                                        id="location" 
-                                        name="location" 
-                                        value="Ukraine"
-                                        maxlength="100"
-                                    >
+                                    <input type="text" id="location" name="location" value="Ukraine" maxlength="100">
                                 </div>
                             </div>
 
                             <div class="form-group">
-                                <label for="device">Пристрій</label>
+                                <span class="form-label">Пристрій</span>
                                 <div class="radio-group">
                                     <label class="radio-label">
                                         <input type="radio" name="device" value="desktop" checked>
@@ -188,24 +181,49 @@
                     <div class="scoring-layout">
                         <!-- Editor Section -->
                         <div class="card editor-card">
-                            <div class="editor-header">
-                                <h3>✍️ Ваш контент</h3>
-                                <div class="format-selector">
-                                    <label>
-                                        <input type="radio" name="format" value="html" checked>
+                            <h2>✍️ Оцінка Контенту</h2>
+                            <p class="card-description">Вставте свій текст або HTML для автоматичної оцінки</p>
+
+                            <!-- Editor Controls -->
+                            <div class="form-group">
+                                <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                                    <button type="button" class="btn btn-secondary" id="editorModeHtml"
+                                        onclick="switchEditorMode('html')" style="flex: 1;">
+                                        💻 HTML
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" id="editorModePreview"
+                                        onclick="switchEditorMode('preview')" style="flex: 1;">
+                                        📄 Preview
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Editor Modes -->
+                            <div class="form-group">
+                                <div style="display: flex; gap: 1rem;">
+                                    <label style="flex: 1;">
+                                        <input type="radio" name="contentMode" value="html" checked>
                                         HTML
                                     </label>
-                                    <label>
-                                        <input type="radio" name="format" value="markdown">
+                                    <label style="flex: 1;">
+                                        <input type="radio" name="contentMode" value="markdown">
                                         Markdown
                                     </label>
                                 </div>
                             </div>
-                            <textarea 
-                                id="contentEditor" 
-                                class="content-editor"
-                                placeholder="Вставте або напишіть свій контент тут...&#10;&#10;Приклад HTML:&#10;<h1>Заголовок</h1>&#10;<p>Ваш текст...</p>"
-                            ></textarea>
+
+                            <!-- HTML Editor -->
+                            <div id="htmlEditorContainer" class="form-group">
+                                <label for="draftContent">Ваш контент</label>
+                                <textarea id="draftContent" class="content-editor"
+                                    placeholder="Вставте HTML або текст..."></textarea>
+                            </div>
+
+                            <!-- Preview Container -->
+                            <div id="previewContainer" class="hidden"
+                                style="background: white; color: #1a1a1a; padding: 2rem; border-radius: 8px; min-height: 400px; font-family: Georgia, serif; line-height: 1.6;">
+                                <div id="contentPreview"></div>
+                            </div>
                             <div class="editor-stats">
                                 <span>Слів: <strong id="wordCount">0</strong></span>
                                 <span>Символів: <strong id="charCount">0</strong></span>
@@ -215,12 +233,13 @@
                         <!-- Score Display Section -->
                         <div class="card score-card">
                             <h3>📊 Оцінка</h3>
-                            
+
                             <!-- Total Score -->
                             <div class="score-circle-container">
                                 <svg class="score-circle" viewBox="0 0 200 200">
                                     <circle class="score-circle-bg" cx="100" cy="100" r="90"></circle>
-                                    <circle class="score-circle-fill" cx="100" cy="100" r="90" id="scoreCircle"></circle>
+                                    <circle class="score-circle-fill" cx="100" cy="100" r="90" id="scoreCircle">
+                                    </circle>
                                 </svg>
                                 <div class="score-value">
                                     <span class="score-number" id="scoreNumber">0</span>
@@ -253,10 +272,30 @@
                                 </div>
                             </div>
 
+                            <!-- AI Coach Button -->
+                            <button class="btn btn-ai" id="coachBtn">
+                                <span>🤖 SEO Coach</span>
+                            </button>
+
                             <!-- Recommendations -->
                             <div class="recommendations hidden" id="recommendations">
                                 <h4>💡 Рекомендації</h4>
                                 <ul id="recommendationsList"></ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Coach Panel (Sidebar) -->
+                    <div class="coach-panel hidden" id="coachPanel">
+                        <div class="coach-header">
+                            <h3>🎓 SEO Coach</h3>
+                            <button class="close-btn" onclick="closeCoachPanel()">✕</button>
+                        </div>
+
+                        <div class="coach-content" id="coachContent">
+                            <div class="coach-loader">
+                                <div class="spinner"></div>
+                                <p>Аналізую ваш контент...</p>
                             </div>
                         </div>
                     </div>
@@ -266,6 +305,83 @@
                         <h3>🔍 Аналіз термінів</h3>
                         <div class="terms-grid" id="termsGrid">
                             <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Writer Tab -->
+                <div class="tab-pane" id="ai-writerTab">
+                    <div class="card">
+                        <h2>🤖 AI Content Writer</h2>
+                        <p class="card-description">Згенеруйте оптимізовану статтю на основі аналізу конкурентів</p>
+
+                        <!-- Step 1: Generate Brief -->
+                        <div id="aiStep1" class="ai-step">
+                            <div class="step-header">
+                                <span class="step-number">1</span>
+                                <h3>Генерація Брифу</h3>
+                            </div>
+                            <p>ШІ проаналізує TOP-10 і створить ідеальну структуру статті.</p>
+                            <button class="btn btn-primary" onclick="generateBrief()">
+                                <span class="btn-text">Згенерувати Бриф</span>
+                                <span class="btn-loader hidden">
+                                    <span class="spinner"></span>
+                                    Аналізую...
+                                </span>
+                            </button>
+                        </div>
+
+                        <!-- Step 2: Review Brief (Hidden initially) -->
+                        <div id="aiStep2" class="ai-step hidden">
+                            <div class="step-header">
+                                <span class="step-number">2</span>
+                                <h3>Перевірка Брифу</h3>
+                            </div>
+                            <div class="brief-editor">
+                                <textarea id="briefEditor" class="content-editor"
+                                    style="height: 300px; font-family: monospace;"></textarea>
+                            </div>
+                            <div class="step-actions">
+                                <button class="btn btn-secondary" onclick="resetAiSteps()">Назад</button>
+                                <button class="btn btn-primary" onclick="generateArticle()">
+                                    <span class="btn-text">Написати Статтю</span>
+                                    <span class="btn-loader hidden">
+                                        <span class="spinner"></span>
+                                        Пишу...
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Step 3: Result (Hidden initially) -->
+                        <div id="aiStep3" class="ai-step hidden">
+                            <div class="step-header">
+                                <span class="step-number">3</span>
+                                <h3>Готово!</h3>
+                            </div>
+                            <p>Стаття успішно згенерована.</p>
+
+                            <!-- Article Preview -->
+                            <div class="article-preview"
+                                style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 1.5rem; margin: 1rem 0; max-height: 400px; overflow-y: auto;">
+                                <h4 style="margin-top: 0; color: var(--accent);">📄 Попередній перегляд</h4>
+                                <div id="articlePreview"
+                                    style="background: white; color: #1a1a1a; padding: 2rem; border-radius: 4px; font-family: Georgia, serif; line-height: 1.6;">
+                                </div>
+                            </div>
+
+                            <div class="step-actions">
+                                <button class="btn btn-secondary" onclick="togglePreview()">
+                                    <span id="previewToggle">Показати HTML</span>
+                                </button>
+                                <button class="btn btn-primary" onclick="copyToEditor()">
+                                    Перенести в Редактор
+                                </button>
+                            </div>
+
+                            <!-- HTML Code (hidden by default) -->
+                            <textarea id="htmlCode" class="content-editor hidden"
+                                style="height: 300px; font-family: monospace; margin-top: 1rem;"></textarea>
                         </div>
                     </div>
                 </div>
@@ -280,7 +396,7 @@
     <footer class="footer">
         <div class="container">
             <p>
-                SEO Аналізатор v1.0 | 
+                SEO Аналізатор v1.0 |
                 <a href="https://github.com/prodan655-png/SEO_Machine_2" target="_blank">GitHub</a>
             </p>
         </div>
@@ -288,4 +404,5 @@
 
     <script src="app.js"></script>
 </body>
+
 </html>

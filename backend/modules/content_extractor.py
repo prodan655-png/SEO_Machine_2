@@ -44,13 +44,18 @@ def fetch_page_content(url: str, timeout: int = 30) -> str:
     
     max_redirects = get_config('content_extraction.max_redirects', 5)
     
+    # Handle mock URLs for development
+    if url.startswith('mock://'):
+        logger.info(f"Serving mock content for {url}")
+        return _get_mock_content(url)
+    
     try:
         response = requests.get(
             url,
             headers=headers,
             timeout=timeout,
             allow_redirects=True,
-            max_redirects=max_redirects
+
         )
         response.raise_for_status()
         return response.text
@@ -228,6 +233,54 @@ async def batch_extract_competitors(urls: List[str]) -> List[Dict[str, Any]]:
     logger.info(f"Batch extraction complete: {valid_count}/{len(results)} valid")
     
     return results
+
+
+def _get_mock_content(url: str) -> str:
+    """Return mock HTML content for development."""
+    return """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <title>Mock Article for Development</title>
+        <meta name="description" content="This is a mock article for testing purposes.">
+    </head>
+    <body>
+        <header>
+            <nav>Menu</nav>
+        </header>
+        <main>
+            <h1>Comprehensive Guide to the Topic</h1>
+            <p class="intro">This is an introductory paragraph that contains important keywords and sets the context for the article. It is long enough to be counted as a paragraph.</p>
+            
+            <h2>1. Introduction to the Subject</h2>
+            <p>Here we discuss the basics of the subject. This is a mock text generated for development purposes. It simulates real content structure.</p>
+            <p>Another paragraph with more details. The content extractor should be able to parse this and count words correctly.</p>
+            
+            <h2>2. Key Benefits and Features</h2>
+            <p>This section lists the benefits. It contains a list:</p>
+            <ul>
+                <li>Benefit 1: Improved efficiency</li>
+                <li>Benefit 2: Better performance</li>
+                <li>Benefit 3: Cost savings</li>
+            </ul>
+            <img src="image1.jpg" alt="Benefit illustration">
+            
+            <h3>2.1 Detailed Analysis</h3>
+            <p>A subsection with more specific details. This helps in testing heading hierarchy extraction.</p>
+            
+            <h2>3. Practical Applications</h2>
+            <p>How to apply this knowledge in real life. This section adds more word count to the document.</p>
+            <p>We need to ensure the total word count is above 200 words to be considered a 'valid' competitor. So here is some more filler text to reach that threshold. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+            
+            <h2>4. Conclusion</h2>
+            <p>Final thoughts and summary. The article ends here.</p>
+        </main>
+        <footer>
+            <p>Copyright 2025 Mock Site</p>
+        </footer>
+    </body>
+    </html>
+    """
 
 
 if __name__ == "__main__":

@@ -41,7 +41,7 @@ const elements = {
     guidelinesGrid: document.getElementById('guidelinesGrid'),
 
     // Scoring
-    contentEditor: document.getElementById('contentEditor'),
+    contentEditor: document.getElementById('draftContent'),
     wordCount: document.getElementById('wordCount'),
     charCount: document.getElementById('charCount'),
     scoreNumber: document.getElementById('scoreNumber'),
@@ -58,7 +58,10 @@ const elements = {
     recommendationsList: document.getElementById('recommendationsList'),
 
     // Toast
-    toastContainer: document.getElementById('toastContainer')
+    toastContainer: document.getElementById('toastContainer'),
+
+    // AI Coach
+    coachBtn: document.getElementById('coachBtn')
 };
 
 // ===== Initialization =====
@@ -78,6 +81,15 @@ function initEventListeners() {
 
     // Content editor
     elements.contentEditor.addEventListener('input', handleEditorInput);
+
+    // AI Coach
+    if (elements.coachBtn) {
+        elements.coachBtn.addEventListener('click', (e) => {
+            console.log('Coach button clicked via listener');
+            e.preventDefault();
+            getSEOCoaching();
+        });
+    }
 }
 
 // ===== API Functions =====
@@ -203,40 +215,66 @@ function stopPolling() {
 }
 
 async function pollAnalysisStatus() {
+    if (!state.currentAnalysisId) return;
+
     try {
         const data = await getAnalysis(state.currentAnalysisId);
-        state.analysisData = data;
-
-        updateStatusDisplay(data);
-
-        if (data.status === 'COMPLETED') {
-            stopPolling();
-            displayResults(data);
-            elements.scoringTab.disabled = false;
-            showToast('Аналіз завершено!', 'success');
-        } else if (data.status === 'FAILED') {
-            stopPolling();
-            elements.statusBadge.textContent = 'Помилка';
-            elements.statusBadge.style.background = 'var(--error)';
-            elements.statusMessage.textContent = data.error_message || 'Виникла помилка';
-            showToast('Помилка аналізу', 'error');
-        }
-
+        handleAnalysisResponse(data);
     } catch (error) {
         console.error('Polling error:', error);
+        if (state.pollingInterval) {
+            clearInterval(state.pollingInterval);
+            state.pollingInterval = null;
+        }
+    }
+}
+
+function handleAnalysisResponse(data) {
+    console.log('DEBUG analysis status:', data.status, data);
+
+    const rawStatus = data.status || '';
+    const status = rawStatus.toLowerCase();
+
+    updateStatusDisplay(data);
+
+    if (status === 'completed') {
+        // Stop polling
+        if (state.pollingInterval) {
+            clearInterval(state.pollingInterval);
+            state.pollingInterval = null;
+        }
+
+        state.analysisData = data;
+        displayResults(data);
+        elements.scoringTab.disabled = false;
+        document.getElementById('aiWriterTab').disabled = false;
+        showToast('Аналіз завершено!', 'success');
+    } else if (status === 'failed') {
+        if (state.pollingInterval) {
+            clearInterval(state.pollingInterval);
+            state.pollingInterval = null;
+        }
+        showToast(data.error_message || 'Аналіз завершився з помилкою.', 'error');
     }
 }
 
 function updateStatusDisplay(data) {
-    if (data.status === 'PROCESSING') {
-        elements.statusBadge.textContent = 'Обробка...';
-        elements.statusMessage.textContent = 'Аналізуємо конкурентів і витягуємо терміни...';
-    } else if (data.status === 'COMPLETED') {
+    const status = String(data.status).toLowerCase();
+
+    if (status === 'completed') {
         elements.statusBadge.textContent = 'Завершено';
-        elements.statusBadge.classList.add('completed');
-        elements.progressFill.classList.add('determinate');
+        elements.statusBadge.className = 'badge completed';
+        elements.progressFill.className = 'progress-fill determinate';
         elements.progressFill.style.width = '100%';
         elements.statusMessage.textContent = 'Аналіз успішно завершено!';
+    } else if (status === 'failed') {
+        elements.statusBadge.textContent = 'Помилка';
+        elements.statusBadge.style.background = 'var(--error)';
+        elements.statusMessage.textContent = data.error_message || 'Щось пішло не так під час аналізу.';
+    } else {
+        elements.statusBadge.textContent = 'Обробка...';
+        elements.statusBadge.className = 'badge';
+        elements.statusMessage.textContent = 'Завантаження даних з пошукової видачі...';
     }
 }
 
@@ -260,10 +298,23 @@ function displayResults(data) {
 }
 
 function displayCompetitors(competitors) {
-    elements.competitorsBody.innerHTML = competitors.map((comp, index) => `
+    elements.competitorsBody.innerHTML = competitors.map((comp, index) => {
+        let hostname = 'N/A';
+        try {
+            // Handle mock:// URLs manually or standard URLs via URL object
+            if (comp.url.startsWith('mock://')) {
+                hostname = comp.url.replace('mock://', '').split('/')[0];
+            } else {
+                hostname = new URL(comp.url).hostname;
+            }
+        } catch (e) {
+            hostname = comp.url;
+        }
+
+        return `
         <tr>
             <td>${comp.position}</td>
-            <td><a href="${comp.url}" target="_blank" class="text-accent">${new URL(comp.url).hostname}</a></td>
+            <td><a href="${comp.url}" target="_blank" class="text-accent">${hostname}</a></td>
             <td>${comp.title || 'N/A'}</td>
             <td>${comp.word_count || 0}</td>
             <td><span class="badge ${comp.status === 'VALID' ? 'completed' : ''}">${comp.status}</span></td>
@@ -275,7 +326,7 @@ function displayCompetitors(competitors) {
                 </label>
             </td>
         </tr>
-    `).join('');
+    `}).join('');
 }
 
 function displayTerms(terms) {
@@ -283,29 +334,33 @@ function displayTerms(terms) {
     elements.termsBody.innerHTML = topTerms.map(term => `
         <tr>
             <td><strong>${term.term}</strong></td>
-            <td>${term.range.min}</td>
-            <td>${term.range.max}</td>
-            <td>${term.range.median}</td>
+            <td>${term.min_recommended || 0}</td>
+            <td>${term.max_recommended || 0}</td>
+            <td>${(term.avg_usage || 0).toFixed(1)}</td>
         </tr>
     `).join('');
 }
 
 function displayGuidelines(guidelines) {
+    const wc = guidelines.word_count || {};
+    const headings = guidelines.headings || {};
+    const images = guidelines.images || {};
+
     elements.guidelinesGrid.innerHTML = `
         <div class="guideline-item">
             <h4>📝 Кількість слів</h4>
-            <p>${guidelines.word_count.min} - ${guidelines.word_count.max}</p>
-            <small>Медіана: ${guidelines.word_count.median}</small>
+            <p>${wc.min != null ? wc.min : 0} - ${wc.max != null ? wc.max : 0}</p>
+            <small>Медіана: ${wc.median != null ? wc.median : 0}</small>
         </div>
         <div class="guideline-item">
             <h4>📑 Заголовки</h4>
-            <p>${guidelines.headings_count.min} - ${guidelines.headings_count.max}</p>
-            <small>Медіана: ${guidelines.headings_count.median}</small>
+            <p>${headings.min != null ? headings.min : 0} - ${headings.max != null ? headings.max : 0}</p>
+            <small>Медіана: ${headings.median != null ? headings.median : 0}</small>
         </div>
         <div class="guideline-item">
             <h4>🖼️ Зображення</h4>
-            <p>${guidelines.images.min} - ${guidelines.images.max}</p>
-            <small>Медіана: ${guidelines.images.median}</small>
+            <p>${images.min != null ? images.min : 0} - ${images.max != null ? images.max : 0}</p>
+            <small>Медіана: ${images.median != null ? images.median : 0}</small>
         </div>
     `;
 }
@@ -321,29 +376,32 @@ async function handleCompetitorToggle(url, enabled) {
 
 // ===== Content Scoring =====
 function handleEditorInput() {
-    const text = elements.contentEditor.value;
+    const text = elements.contentEditor?.value || '';
+
+    console.log('DEBUG handleEditorInput called, text length:', text.length);
 
     // Update stats
     const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
     const chars = text.length;
 
-    elements.wordCount.textContent = words;
-    elements.charCount.textContent = chars;
+    if (elements.wordCount) elements.wordCount.textContent = words;
+    if (elements.charCount) elements.charCount.textContent = chars;
 
-    // Debounce scoring
-    if (state.scoreTimeout) {
-        clearTimeout(state.scoreTimeout);
-    }
-
+    // Debounced scoring
+    clearTimeout(state.scoringTimeout);
     if (text.trim().length > 0) {
-        state.scoreTimeout = setTimeout(() => performScoring(text), SCORE_DEBOUNCE);
+        state.scoringTimeout = setTimeout(() => {
+            console.log('DEBUG triggering performScoring');
+            performScoring(text);
+        }, 500);
     }
 }
 
 async function performScoring(text) {
     if (!state.currentAnalysisId) return;
 
-    const format = document.querySelector('input[name="format"]:checked').value;
+    const formatInput = document.querySelector('input[name="contentMode"]:checked');
+    const format = formatInput ? formatInput.value : 'html';
 
     try {
         const scoreData = await scoreContent(state.currentAnalysisId, text, format);
@@ -484,6 +542,403 @@ function showToast(message, type = 'success') {
         toast.style.animation = 'slideIn 0.3s reverse';
         setTimeout(() => toast.remove(), 300);
     }, 3000);
+}
+
+// ===== SEO Coach (AI) =====
+async function getSEOCoaching() {
+    console.log('DEBUG getSEOCoaching called');
+    console.log('DEBUG Current Analysis ID:', state.currentAnalysisId);
+
+    if (!state.currentAnalysisId) {
+        console.error('DEBUG No analysis ID found');
+        showToast('Спочатку створіть аналіз', 'error');
+        return;
+    }
+
+    const currentScore = parseInt(elements.scoreNumber?.textContent || 0);
+    console.log('DEBUG currentScore:', currentScore);
+
+    if (currentScore === 0) {
+        showToast('Спочатку оцініть ваш контент', 'error');
+        return;
+    }
+
+    const targetScore = 85;
+    const coachPanel = document.getElementById('coachPanel');
+    const coachContent = document.getElementById('coachContent');
+
+    console.log('DEBUG Opening coach panel');
+    coachPanel.classList.remove('hidden');
+    // Small delay to allow display:block to apply before transition
+    setTimeout(() => {
+        coachPanel.classList.add('show');
+    }, 10);
+
+    // Show loading
+    coachContent.innerHTML = `
+        <div class="coach-loader">
+            <div class="spinner"></div>
+            <p>Генерую рекомендації...</p>
+        </div>
+    `;
+
+    try {
+        console.log('DEBUG Sending request to backend');
+        const response = await fetch(`${API_BASE_URL}/api/ai/coach`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                analysis_id: state.currentAnalysisId,
+                current_score: currentScore,
+                target_score: targetScore
+            })
+        });
+
+        console.log('DEBUG Response status:', response.status);
+
+        if (!response.ok) {
+            const error = await response.json();
+            console.error('DEBUG Backend error:', error);
+            throw new Error(error.detail || 'AI Coach недоступний');
+        }
+
+        const coaching = await response.json();
+        console.log('DEBUG Received coaching:', coaching);
+        displayCoachingPanel(coaching, currentScore, targetScore);
+
+    } catch (error) {
+        console.error('Coaching error:', error);
+        coachContent.innerHTML = `
+            <div class="coach-error">
+                <p>⚠️ ${error.message}</p>
+                <p style="margin-top: 1rem; font-size: 0.875rem;">
+                    Переконайтеся що AI_ENABLED=true в конфігурації
+                </p>
+            </div>
+        `;
+    }
+}
+
+function displayCoachingPanel(coaching, currentScore, targetScore) {
+    console.log('DEBUG displayCoachingPanel called with:', coaching);
+    const coachContent = document.getElementById('coachContent');
+    console.log('DEBUG coachContent element:', coachContent);
+
+    let html = `
+        <div class="coach-intro">
+            <p>Ваш score: <strong>${currentScore}/100</strong></p>
+            <p>Мета: <strong>${targetScore}/100</strong></p>
+            <p style="color: var(--accent-light); margin-top: 0.5rem;">
+                Гайд покращень ↓
+            </p>
+        </div>
+        <hr style="border-color: var(--border); margin: 1.5rem 0;">
+    `;
+
+    // Priority Actions
+    if (coaching.priority_actions && coaching.priority_actions.length > 0) {
+        html += `
+            <div class="coach-section">
+                <h4>🎯 Пріоритетні дії</h4>
+                <ul class="priority-actions">
+        `;
+
+        coaching.priority_actions.forEach((action, index) => {
+            html += `
+                <li class="action-item" id="action-${index}">
+                    <div class="action-header">
+                        <input type="checkbox" class="action-checkbox" 
+                               onchange="toggleActionItem(${index})">
+                        <div class="action-title">${action.action}</div>
+                        <span class="impact-badge impact-${action.impact}">${action.impact}</span>
+                    </div>
+                    <div class="action-meta">
+                        <span>📊 ${action.score_gain}</span>
+                        <span>⏱️ ${action.difficulty}</span>
+                    </div>
+                    <div class="action-details">${action.details}</div>
+                </li>
+            `;
+        });
+
+        html += `
+                </ul>
+            </div>
+        `;
+    }
+
+    // Content Suggestions
+    if (coaching.content_suggestions && coaching.content_suggestions.length > 0) {
+        html += `
+            <div class="coach-section">
+                <h4>💡 Поради</h4>
+                <ul class="content-suggestions">
+        `;
+
+        coaching.content_suggestions.forEach(suggestion => {
+            html += `<li>${suggestion}</li>`;
+        });
+
+        html += `
+                </ul>
+            </div>
+        `;
+    }
+
+    // Term Recommendations
+    if (coaching.term_recommendations) {
+        const { add_more, reduce } = coaching.term_recommendations;
+
+        if ((add_more && add_more.length > 0) || (reduce && reduce.length > 0)) {
+            html += `
+                <div class="coach-section">
+                    <h4>🔑 Терміни</h4>
+                    <div class="term-recommendations">
+            `;
+
+            if (add_more && add_more.length > 0) {
+                html += `
+                    <div class="term-list">
+                        <h5>Додати:</h5>
+                        <div class="term-chips">
+                `;
+                add_more.forEach(term => {
+                    html += `<span class="term-chip">${term}</span>`;
+                });
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (reduce && reduce.length > 0) {
+                html += `
+                    <div class="term-list">
+                        <h5>Зменшити:</h5>
+                        <div class="term-chips">
+                `;
+                reduce.forEach(term => {
+                    html += `<span class="term-chip reduce">${term}</span>`;
+                });
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += `
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // Estimated Time
+    if (coaching.estimated_time) {
+        html += `
+            <div class="estimated-time">
+                ⏱️ Орієнтовний час: ${coaching.estimated_time}
+            </div>
+        `;
+    }
+
+    coachContent.innerHTML = html;
+}
+
+function closeCoachPanel() {
+    const panel = document.getElementById('coachPanel');
+    panel.classList.remove('show');
+    setTimeout(() => {
+        panel.classList.add('hidden');
+    }, 300); // Wait for transition
+}
+
+function toggleActionItem(index) {
+    const item = document.getElementById(`action-${index}`);
+    const checkbox = item.querySelector('.action-checkbox');
+
+    if (checkbox.checked) {
+        item.classList.add('checked');
+    } else {
+        item.classList.remove('checked');
+    }
+}
+
+// ===== AI Writer =====
+let currentBrief = null;
+
+async function generateBrief() {
+    if (!state.currentAnalysisId) {
+        showToast('Спочатку створіть аналіз', 'error');
+        return;
+    }
+
+    const btn = document.querySelector('#aiStep1 .btn-primary');
+    const loader = btn.querySelector('.btn-loader');
+    const text = btn.querySelector('.btn-text');
+
+    btn.disabled = true;
+    text.classList.add('hidden');
+    loader.classList.remove('hidden');
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/ai/brief`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                analysis_id: state.currentAnalysisId,
+                tone: 'professional'
+            })
+        });
+
+        if (!response.ok) throw new Error('Помилка генерації брифу');
+
+        currentBrief = await response.json();
+
+        // Show step 2
+        document.getElementById('aiStep1').classList.add('hidden');
+        document.getElementById('aiStep2').classList.remove('hidden');
+
+        // Fill editor
+        const editor = document.getElementById('briefEditor');
+        editor.value = JSON.stringify(currentBrief, null, 2);
+
+        showToast('Бриф згенеровано!', 'success');
+
+    } catch (error) {
+        showToast(error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        text.classList.remove('hidden');
+        loader.classList.add('hidden');
+    }
+}
+
+async function generateArticle() {
+    if (!currentBrief) return;
+
+    const btn = document.querySelector('#aiStep2 .btn-primary');
+    const loader = btn.querySelector('.btn-loader');
+    const text = btn.querySelector('.btn-text');
+
+    // Get updated brief from editor
+    try {
+        const editorContent = document.getElementById('briefEditor').value;
+        currentBrief = JSON.parse(editorContent);
+    } catch (e) {
+        showToast('Помилка в JSON форматі брифу', 'error');
+        return;
+    }
+
+    btn.disabled = true;
+    text.classList.add('hidden');
+    loader.classList.remove('hidden');
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/ai/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                brief: currentBrief,
+                tone: 'professional',
+                language: document.getElementById('language').value
+            })
+        });
+
+        if (!response.ok) throw new Error('Помилка генерації статті');
+
+        const result = await response.json();
+
+        // Store result temporarily
+        state.generatedContent = result.content;
+
+        // Show preview
+        const previewDiv = document.getElementById('articlePreview');
+        const htmlCode = document.getElementById('htmlCode');
+        previewDiv.innerHTML = result.content;
+        htmlCode.value = result.content;
+
+        // Show step 3
+        document.getElementById('aiStep2').classList.add('hidden');
+        document.getElementById('aiStep3').classList.remove('hidden');
+
+        showToast('Статтю написано!', 'success');
+
+    } catch (error) {
+        showToast(error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        text.classList.remove('hidden');
+        loader.classList.add('hidden');
+    }
+}
+
+function copyToEditor() {
+    if (state.generatedContent) {
+        if (elements.contentEditor) {
+            elements.contentEditor.value = state.generatedContent;
+        }
+        handleEditorInput(); // Trigger scoring
+        switchTab('scoring');
+        showToast('Контент перенесено в редактор', 'success');
+
+        // Reset steps
+        resetAiSteps();
+    }
+}
+
+function resetAiSteps() {
+    document.getElementById('aiStep1').classList.remove('hidden');
+    document.getElementById('aiStep2').classList.add('hidden');
+    document.getElementById('aiStep3').classList.add('hidden');
+    currentBrief = null;
+    state.generatedContent = null;
+}
+
+function togglePreview() {
+    const preview = document.getElementById('articlePreview');
+    const htmlCode = document.getElementById('htmlCode');
+    const toggle = document.getElementById('previewToggle');
+
+    if (htmlCode.classList.contains('hidden')) {
+        // Show HTML code
+        preview.classList.add('hidden');
+        htmlCode.classList.remove('hidden');
+        toggle.textContent = 'Показати Preview';
+    } else {
+        // Show preview
+        htmlCode.classList.add('hidden');
+        preview.classList.remove('hidden');
+        toggle.textContent = 'Показати HTML';
+    }
+}
+
+function switchEditorMode(mode) {
+    const htmlContainer = document.getElementById('htmlEditorContainer');
+    const previewContainer = document.getElementById('previewContainer');
+    const previewDiv = document.getElementById('contentPreview');
+    const editor = document.getElementById('draftContent');
+    const btnHtml = document.getElementById('editorModeHtml');
+    const btnPreview = document.getElementById('editorModePreview');
+
+    if (mode === 'preview') {
+        // Show preview
+        htmlContainer.classList.add('hidden');
+        previewContainer.classList.remove('hidden');
+        previewDiv.innerHTML = editor.value;
+        btnHtml.classList.remove('btn-primary');
+        btnHtml.classList.add('btn-secondary');
+        btnPreview.classList.remove('btn-secondary');
+        btnPreview.classList.add('btn-primary');
+    } else {
+        // Show HTML editor
+        previewContainer.classList.add('hidden');
+        htmlContainer.classList.remove('hidden');
+        btnPreview.classList.remove('btn-primary');
+        btnPreview.classList.add('btn-secondary');
+        btnHtml.classList.remove('btn-secondary');
+        btnHtml.classList.add('btn-primary');
+    }
 }
 
 // ===== Utility Functions =====
