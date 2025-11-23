@@ -1049,17 +1049,29 @@ let iterationState = {
     iterations: []
 };
 
-async function startIteration(targetScore = 85, maxIterations = 5) {
+async function startIteration(targetScore = 85, maxIterations = 10) {
+    console.log('🔄 startIteration called', { targetScore, maxIterations });
+    console.log('State:', { analysisId: state.currentAnalysisId, currentScore: state.currentScore });
+
     if (!state.currentAnalysisId) {
+        console.error('❌ No analysis ID');
         showToast('Спочатку створіть аналіз', 'error');
         return;
     }
 
     const content = elements.contentEditor?.value;
+    console.log('Content length:', content?.length);
+
     if (!content) {
+        console.error('❌ No content');
         showToast('Немає контенту для покращення', 'error');
         return;
     }
+
+    console.log('✅ Starting iteration...');
+
+    // Show immediate feedback
+    showToast('🔄 Запускаю ітеративне покращення... Це займе 2-3 хвилини', 'info');
 
     iterationState.running = true;
     iterationState.currentStep = 0;
@@ -1068,15 +1080,38 @@ async function startIteration(targetScore = 85, maxIterations = 5) {
     iterationState.targetScore = targetScore;
     iterationState.iterations = [];
 
+    // Show modal
+    console.log('Opening iteration modal...');
     const modal = document.getElementById('iterationModal');
+    console.log('Modal element:', modal);
+
+    if (!modal) {
+        console.error('❌ Modal element not found!');
+        showToast('Помилка: модальне вікно не знайдено', 'error');
+        return;
+    }
+
     modal.classList.remove('hidden');
+    modal.style.display = 'flex';  // Force display
+    modal.style.zIndex = '9999';   // Ensure it's on top
+    console.log('Modal classes after remove hidden:', modal.className);
+    console.log('Modal computed style:', window.getComputedStyle(modal).display);
 
     document.getElementById('iterationScoreTracker').textContent =
         `${iterationState.initialScore} → ${targetScore}`;
     document.getElementById('iterationCounter').textContent =
-        `Крок 0/${maxIterations}`;
+        `Обробка... 0/${maxIterations}`;
     document.getElementById('iterationProgressBar').style.width = '0%';
-    document.getElementById('iterationSteps').innerHTML = '';
+
+    // Show loading state
+    const stepsContainer = document.getElementById('iterationSteps');
+    stepsContainer.innerHTML = `
+        <div style="text-align: center; padding: 2rem;">
+            <div class="spinner" style="margin: 0 auto 1rem;"></div>
+            <p style="color: var(--text-secondary);">⏳ Аналізую контент та генерую покращення...</p>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">Це може зайняти 1-3 хвилини</p>
+        </div>
+    `;
 
     try {
         const response = await fetch(`${API_BASE_URL}/api/ai/iterate`, {
@@ -1173,5 +1208,5 @@ function closeIterationModal() {
 // Start iteration from Coach panel
 function startIterationFromCoach() {
     closeCoachPanel();
-    startIteration(85, 5);
+    startIteration(85, 10);  // Increased to 10 iterations
 }

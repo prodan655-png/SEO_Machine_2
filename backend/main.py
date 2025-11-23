@@ -19,9 +19,8 @@ from sqlalchemy.orm import sessionmaker, Session
 # Add backend to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config import DATABASE_URL, ALLOWED_ORIGINS
-from database import SessionLocal, Analysis, Competitor, Term, Guideline, Draft, AnalysisStatus
-from config import get_config, get_db
+from config import DATABASE_URL, ALLOWED_ORIGINS, get_config
+from database import Base, SessionLocal, Analysis, Competitor, Term, Guideline, Draft, AnalysisStatus, get_db
 from logger import setup_logger
 from modules.serp_fetcher import fetch_serp
 from modules.content_extractor import batch_extract_competitors
@@ -85,7 +84,7 @@ class AnalysisCreateResponse(BaseModel):
 
 
 class ScoreDraftRequest(BaseModel):
-    text: str = Field(..., min_length=1, max_length=50000)
+    text: str = Field(..., min_length=1)
     format: str = Field(default="html", pattern="^(html|markdown)$")
 
 

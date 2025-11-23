@@ -508,6 +508,11 @@ textarea::placeholder {
     display: none !important;
 }
 
+/* Override hidden for iteration modal when not hidden */
+.iteration-modal:not(.hidden) {
+    display: flex !important;
+}
+
 /* ===== Status Card ===== */
 .status-header {
     display: flex;
@@ -1224,4 +1229,17 @@ tr:hover {
 
 .toggle input:checked+.toggle-slider:before {
     transform: translateX(24px);
+}
+/* Spinner Animation */
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(59, 130, 246, 0.1);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }

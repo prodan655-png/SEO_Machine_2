@@ -97,13 +97,23 @@ def _fetch_serper_dev(
         
         organic_results = data.get("organic", [])
         
-        if not organic_results:
+        # Filter out Russian and Belarusian domains
+        blocked_domains = ['.ru', '.by', '.su']
+        filtered_results = [
+            result for result in organic_results
+            if not any(result.get('link', '').endswith(domain) or f"{domain}/" in result.get('link', '') 
+                      for domain in blocked_domains)
+        ]
+        
+        logger.info(f"Filtered {len(organic_results) - len(filtered_results)} Russian/Belarusian sites from {len(organic_results)} results")
+        
+        if not filtered_results:
             raise NoSerpResultsError(f"No SERP results for keyword '{keyword}'")
             
         results = []
         domains_seen = set()
         
-        for idx, result in enumerate(organic_results[:count]):
+        for idx, result in enumerate(filtered_results[:count]):
             url = result.get("link")
             domain = _extract_domain(url)
             domains_seen.add(domain)
