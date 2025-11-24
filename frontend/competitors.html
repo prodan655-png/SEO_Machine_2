@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEO Machine - Competitors</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="layout-redesign.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Header injected by header.js -->
+
+    <main class="main">
+        <div class="container">
+            <div class="header-actions"
+                style="margin: 2rem 0; display: flex; justify-content: space-between; align-items: center;">
+                <h2>📈 Competitor Analysis <span id="comp-keyword"
+                        style="font-weight: normal; font-size: 0.8em; color: var(--text-secondary);"></span></h2>
+                <a href="#" id="back-to-editor" class="btn btn-secondary">← Back to Editor</a>
+            </div>
+
+            <!-- Competitors Table -->
+            <div class="card">
+                <h3>TOP-10 Results</h3>
+                <div class="table-wrapper">
+                    <table class="competitors-table" id="competitorsTable"
+                        style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="text-align: left; border-bottom: 1px solid var(--border);">
+                                <th style="padding: 1rem;">#</th>
+                                <th style="padding: 1rem;">URL</th>
+                                <th style="padding: 1rem;">Title</th>
+                                <th style="padding: 1rem;">Words</th>
+                                <th style="padding: 1rem;">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="competitorsBody">
+                            <tr>
+                                <td colspan="5" style="padding: 2rem; text-align: center;">Loading data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Terms Table -->
+            <div class="card" style="margin-top: 2rem;">
+                <h3>🔑 Keyword Statistics</h3>
+                <div class="table-wrapper">
+                    <table class="terms-table" id="termsTable" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="text-align: left; border-bottom: 1px solid var(--border);">
+                                <th style="padding: 1rem;">Term</th>
+                                <th style="padding: 1rem;">Min</th>
+                                <th style="padding: 1rem;">Max</th>
+                                <th style="padding: 1rem;">Avg</th>
+                            </tr>
+                        </thead>
+                        <tbody id="termsBody">
+                            <tr>
+                                <td colspan="4" style="padding: 2rem; text-align: center;">Loading data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/api.js"></script>
+    <script src="components/header.js"></script>
+    <script src="js/competitors.js?v=2"></script>
+</body>
+
+</html>

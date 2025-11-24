@@ -140,12 +140,17 @@ async def process_analysis_task(analysis_id: str):
         # Filter valid competitors
         valid_competitors = [c for c in extracted_data if c['status'] == 'valid']
         
+        # Fallback to weak competitors if needed
         if not valid_competitors:
-            error_msg = "Не вдалося знайти достатньо конкурентів для аналізу. Спробуйте інший запит."
+            logger.warning(f"No 'valid' competitors found for {analysis_id}, checking 'weak' ones.")
+            valid_competitors = [c for c in extracted_data if c['status'] == 'weak']
+        
+        if not valid_competitors:
+            error_msg = "Не вдалося знайти достатньо конкурентів (навіть з коротким контентом). Спробуйте інший запит."
             analysis.status = AnalysisStatus.FAILED
             analysis.error_message = error_msg
             db.commit()
-            logger.error(f"Analysis {analysis_id} failed: No valid competitors found")
+            logger.error(f"Analysis {analysis_id} failed: No valid or weak competitors found")
             return
 
         # Step 3: Save competitors to database

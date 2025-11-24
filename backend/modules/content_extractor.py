@@ -37,9 +37,17 @@ def fetch_page_content(url: str, timeout: int = 30) -> str:
     ])
     
     headers = {
-        'User-Agent': user_agents[0],
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9,uk;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Cache-Control': 'max-age=0',
     }
     
     max_redirects = get_config('content_extraction.max_redirects', 5)
@@ -50,12 +58,15 @@ def fetch_page_content(url: str, timeout: int = 30) -> str:
         return _get_mock_content(url)
     
     try:
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
         response = requests.get(
             url,
             headers=headers,
             timeout=timeout,
             allow_redirects=True,
-
+            verify=False  # Skip SSL verification to avoid errors on some sites
         )
         response.raise_for_status()
         return response.text
@@ -78,7 +89,10 @@ def detect_language(html: str) -> Optional[str]:
     Returns:
         Language code (e.g., 'en', 'uk') or None
     """
-    soup = BeautifulSoup(html, 'lxml')
+    try:
+        soup = BeautifulSoup(html, 'lxml')
+    except Exception:
+        soup = BeautifulSoup(html, 'html.parser')
     
     # Try html lang attribute
     html_tag = soup.find('html')
@@ -106,7 +120,11 @@ def extract_main_content(html: str, url: str) -> Dict[str, Any]:
     Returns:
         Dict with extracted content data
     """
-    soup = BeautifulSoup(html, 'lxml')
+    try:
+        soup = BeautifulSoup(html, 'lxml')
+    except Exception as e:
+        logger.warning(f"lxml failed for {url}, falling back to html.parser: {e}")
+        soup = BeautifulSoup(html, 'html.parser')
     
     # Remove unwanted elements
     for element in soup(['script', 'style', 'nav', 'header', 'footer', 

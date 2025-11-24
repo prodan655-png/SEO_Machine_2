@@ -59,7 +59,7 @@ GEMINI_API_KEY = get_env_var('GEMINI_API_KEY')
 OPENAI_API_KEY = get_env_var('OPENAI_API_KEY')
 
 # CORS
-ALLOWED_ORIGINS = get_env_var('ALLOWED_ORIGINS', default='http://localhost:8080').split(',')
+ALLOWED_ORIGINS = get_env_var('ALLOWED_ORIGINS', default='http://localhost:8080,http://localhost:8081').split(',')
 
 # Auth
 ADMIN_TOKEN = get_env_var('ADMIN_TOKEN')

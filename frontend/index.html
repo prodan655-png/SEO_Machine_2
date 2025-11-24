@@ -4,8 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="SEO Аналізатор - інструмент для аналізу та оптимізації контенту">
-    <title>SEO Аналізатор</title>
+    <title>SEO Machine - Dashboard</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="layout-redesign.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,488 +13,87 @@
 </head>
 
 <body>
-    <!-- Header -->
-    <header class="header">
-        <div class="container">
-            <div class="header-content">
-                <div class="logo">
-                    <h1>🔍 SEO Аналізатор</h1>
-                    <p class="tagline">Професійний аналіз контенту для TOP-10</p>
-                </div>
-                <div class="api-status">
-                    <span class="status-dot" id="apiStatus"></span>
-                    <span class="status-text" id="apiStatusText">Перевірка...</span>
-                </div>
-            </div>
-        </div>
-    </header>
+    <!-- Header injected by header.js -->
 
-    <!-- Main Content -->
     <main class="main">
         <div class="container">
-            <!-- Tabs Navigation -->
-            <nav class="tabs">
-                <button class="tab-btn active" data-tab="create">
-                    <span class="tab-icon">➕</span>
-                    Новий Аналіз
-                </button>
-                <button class="tab-btn" data-tab="results" id="resultsTab" disabled>
-                    <span class="tab-icon">📊</span>
-                    Результати
-                </button>
-                <button class="tab-btn" data-tab="ai-writer" id="aiWriterTab" disabled>
-                    <span class="tab-icon">🤖</span>
-                    AI Writer
-                </button>
-                <button class="tab-btn" data-tab="scoring" id="scoringTab" disabled>
-                    <span class="tab-icon">✍️</span>
-                    Оцінка Контенту
-                </button>
-            </nav>
+            <div class="dashboard-grid"
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 2rem;">
 
-            <!-- Tab Content -->
-            <div class="tab-content">
-                <!-- Create Analysis Tab -->
-                <div class="tab-pane active" id="createTab">
-                    <div class="card">
-                        <h2>Створити новий аналіз</h2>
-                        <p class="card-description">Введіть ключове слово для аналізу TOP-10 результатів пошуку</p>
+                <!-- Create Analysis Card -->
+                <div class="card">
+                    <h2>🚀 New Analysis</h2>
+                    <p class="card-description">Analyze TOP-10 search results for a keyword.</p>
 
-                        <form id="analysisForm" class="form">
+                    <form id="createAnalysisForm" class="form">
+                        <div class="form-group">
+                            <label for="keyword">Keyword *</label>
+                            <input type="text" id="keyword" name="keyword" placeholder="e.g. seo optimization" required
+                                minlength="2">
+                        </div>
+
+                        <div class="form-row">
                             <div class="form-group">
-                                <label for="keyword">Ключове слово *</label>
-                                <input type="text" id="keyword" name="keyword" placeholder="напр. seo оптимізація"
-                                    required minlength="2" maxlength="100">
+                                <label for="language">Language</label>
+                                <select id="language" name="language">
+                                    <option value="uk">🇺🇦 Ukrainian</option>
+                                    <option value="en">🇬🇧 English</option>
+                                </select>
                             </div>
-
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="language">Мова</label>
-                                    <select id="language" name="language">
-                                        <option value="uk">🇺🇦 Українська</option>
-                                        <option value="en">🇬🇧 English</option>
-                                    </select>
-                                </div>
-
-                                <div class="form-group">
-                                    <label for="location">Локація</label>
-                                    <input type="text" id="location" name="location" value="Ukraine" maxlength="100">
-                                </div>
-                            </div>
-
                             <div class="form-group">
-                                <span class="form-label">Пристрій</span>
-                                <div class="radio-group">
-                                    <label class="radio-label">
-                                        <input type="radio" name="device" value="desktop" checked>
-                                        <span>💻 Desktop</span>
-                                    </label>
-                                    <label class="radio-label">
-                                        <input type="radio" name="device" value="mobile">
-                                        <span>📱 Mobile</span>
-                                    </label>
-                                </div>
+                                <label for="location">Location</label>
+                                <input type="text" id="location" name="location" value="Ukraine">
                             </div>
+                        </div>
 
-                            <button type="submit" class="btn btn-primary" id="submitBtn">
-                                <span class="btn-text">Розпочати аналіз</span>
-                                <span class="btn-loader hidden">
-                                    <span class="spinner"></span>
-                                    Обробка...
-                                </span>
-                            </button>
-                        </form>
+                        <button type="submit" class="btn btn-primary" id="submitBtn">
+                            <span class="btn-text">Start Analysis</span>
+                            <span class="btn-loader hidden">
+                                <span class="spinner"></span>
+                                Processing...
+                            </span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Recent Analyses (Placeholder) -->
+                <div class="card">
+                    <h2>🕒 Recent History</h2>
+                    <p class="card-description">Your recent projects.</p>
+                    <div class="history-list">
+                        <p style="color: var(--text-secondary); font-style: italic;">No recent history found.</p>
+                        <!-- TODO: Implement history list -->
                     </div>
                 </div>
 
-                <!-- Results Tab -->
-                <div class="tab-pane" id="resultsTab">
-                    <!-- Analysis Status -->
-                    <div class="card" id="statusCard">
-                        <div class="status-header">
-                            <h3>Статус аналізу</h3>
-                            <span class="badge" id="statusBadge">Обробка...</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="progressFill"></div>
-                        </div>
-                        <p class="status-message" id="statusMessage">Завантаження даних з пошукової видачі...</p>
-                    </div>
-
-                    <!-- Results Content (hidden until completed) -->
-                    <div id="resultsContent" class="hidden">
-                        <!-- Competitors Section -->
-                        <div class="card">
-                            <h3>📈 Конкуренти (TOP-10)</h3>
-                            <div class="table-wrapper">
-                                <table class="competitors-table" id="competitorsTable">
-                                    <thead>
-                                        <tr>
-                                            <th>#</th>
-                                            <th>URL</th>
-                                            <th>Заголовок</th>
-                                            <th>Слова</th>
-                                            <th>Статус</th>
-                                            <th>Увімкнути</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="competitorsBody">
-                                        <!-- Populated by JS -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <!-- Terms Section -->
-                        <div class="card">
-                            <h3>🔑 Ключові терміни</h3>
-                            <p class="card-description">Рекомендована частота використання термінів</p>
-                            <div class="table-wrapper">
-                                <table class="terms-table" id="termsTable">
-                                    <thead>
-                                        <tr>
-                                            <th>Термін</th>
-                                            <th>Мін</th>
-                                            <th>Макс</th>
-                                            <th>Медіана</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="termsBody">
-                                        <!-- Populated by JS -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <!-- Guidelines Section -->
-                        <div class="card">
-                            <h3>📋 Рекомендації</h3>
-                            <div class="guidelines-grid" id="guidelinesGrid">
-                                <!-- Populated by JS -->
-                            </div>
-                        </div>
+                <!-- Quick Actions -->
+                <div class="card">
+                    <h2>⚡ Quick Actions</h2>
+                    <div class="action-list" style="display: flex; flex-direction: column; gap: 1rem;">
+                        <a href="editor.html" class="btn btn-secondary" style="text-align: center;">
+                            Open Editor (Empty)
+                        </a>
+                        <a href="competitors.html" class="btn btn-secondary" style="text-align: center;">
+                            View Competitors
+                        </a>
                     </div>
                 </div>
 
-                <!-- Scoring Tab -->
-                <div class="tab-pane" id="scoringTab">
-                    <div class="scoring-layout">
-                        <!-- Editor Section -->
-                        <div class="card editor-card">
-                            <h2>✍️ Оцінка Контенту</h2>
-                            <p class="card-description">Вставте свій текст або HTML для автоматичної оцінки</p>
-
-                            <!-- Editor Controls -->
-                            <div class="form-group">
-                                <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-                                    <button type="button" class="btn btn-secondary" id="editorModeHtml"
-                                        onclick="switchEditorMode('html')" style="flex: 1;">
-                                        💻 HTML
-                                    </button>
-                                    <button type="button" class="btn btn-secondary" id="editorModePreview"
-                                        onclick="switchEditorMode('preview')" style="flex: 1;">
-                                        📄 Preview
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- Editor Modes -->
-                            <div class="form-group">
-                                <div style="display: flex; gap: 1rem;">
-                                    <label style="flex: 1;">
-                                        <input type="radio" name="contentMode" value="html" checked>
-                                        HTML
-                                    </label>
-                                    <label style="flex: 1;">
-                                        <input type="radio" name="contentMode" value="markdown">
-                                        Markdown
-                                    </label>
-                                </div>
-                            </div>
-
-                            <!-- HTML Editor -->
-                            <div id="htmlEditorContainer" class="form-group">
-                                <label for="draftContent">Ваш контент</label>
-                                <textarea id="draftContent" class="content-editor"
-                                    placeholder="Вставте HTML або текст..."></textarea>
-                            </div>
-
-                            <!-- Preview Container -->
-                            <div id="previewContainer" class="hidden"
-                                style="background: white; color: #1a1a1a; padding: 2rem; border-radius: 8px; min-height: 400px; font-family: Georgia, serif; line-height: 1.6;">
-                                <div id="contentPreview"></div>
-                            </div>
-                            <div class="editor-stats">
-                                <span>Слів: <strong id="wordCount">0</strong></span>
-                                <span>Символів: <strong id="charCount">0</strong></span>
-                            </div>
-                        </div>
-
-                        <!-- Score Display Section -->
-                        <div class="card score-card">
-                            <h3>📊 Оцінка</h3>
-
-                            <!-- Total Score -->
-                            <div class="score-circle-container">
-                                <svg class="score-circle" viewBox="0 0 200 200">
-                                    <circle class="score-circle-bg" cx="100" cy="100" r="90"></circle>
-                                    <circle class="score-circle-fill" cx="100" cy="100" r="90" id="scoreCircle">
-                                    </circle>
-                                </svg>
-                                <div class="score-value">
-                                    <span class="score-number" id="scoreNumber">0</span>
-                                    <span class="score-max">/100</span>
-                                </div>
-                            </div>
-
-                            <!-- Score Breakdown -->
-                            <div class="score-breakdown" id="scoreBreakdown">
-                                <div class="score-item">
-                                    <span class="score-label">Терміни</span>
-                                    <div class="score-bar">
-                                        <div class="score-bar-fill" id="termsBar" style="width: 0%"></div>
-                                    </div>
-                                    <span class="score-text" id="termsScore">0/60</span>
-                                </div>
-                                <div class="score-item">
-                                    <span class="score-label">Структура</span>
-                                    <div class="score-bar">
-                                        <div class="score-bar-fill" id="structureBar" style="width: 0%"></div>
-                                    </div>
-                                    <span class="score-text" id="structureScore">0/20</span>
-                                </div>
-                                <div class="score-item">
-                                    <span class="score-label">Заголовки</span>
-                                    <div class="score-bar">
-                                        <div class="score-bar-fill" id="headingsBar" style="width: 0%"></div>
-                                    </div>
-                                    <span class="score-text" id="headingsScore">0/20</span>
-                                </div>
-                            </div>
-
-                            <!-- AI Coach Button -->
-                            <button class="btn btn-ai" id="coachBtn">
-                                <span>🤖 SEO Coach</span>
-                            </button>
-
-                            <!-- Recommendations -->
-                            <div class="recommendations hidden" id="recommendations">
-                                <h4>💡 Рекомендації</h4>
-                                <ul id="recommendationsList"></ul>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Coach Panel (Sidebar) -->
-                    <div class="coach-panel hidden" id="coachPanel">
-                        <div class="coach-header">
-                            <h3>🎓 SEO Coach</h3>
-                            <button class="close-btn" onclick="closeCoachPanel()">✕</button>
-                        </div>
-
-                        <div class="coach-content" id="coachContent">
-                            <div class="coach-loader">
-                                <div class="spinner"></div>
-                                <p>Аналізую ваш контент...</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Term Details -->
-                    <div class="card hidden" id="termDetailsCard">
-                        <h3>🔍 Аналіз термінів</h3>
-                        <div class="terms-grid" id="termsGrid">
-                            <!-- Populated by JS -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- AI Writer Tab -->
-                <div class="tab-pane" id="ai-writerTab">
-                    <div class="card">
-                        <h2>🤖 AI Content Writer</h2>
-                        <p class="card-description">Згенеруйте оптимізовану статтю на основі аналізу конкурентів</p>
-
-                        <!-- Sitemap Settings -->
-                        <div class="card-section"
-                            style="margin-bottom: 2rem; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px;">
-                            <h4 style="margin-top: 0;">🔗 Внутрішня перелінковка</h4>
-                            <div class="form-row" style="display: flex; gap: 1rem; align-items: flex-end;">
-                                <div class="form-group" style="flex: 1;">
-                                    <label for="sitemapUrl">URL Sitemap (XML)</label>
-                                    <input type="url" id="sitemapUrl" placeholder="https://site.com/sitemap.xml">
-                                </div>
-                                <button class="btn btn-secondary" onclick="fetchSitemap()" id="fetchSitemapBtn"
-                                    style="margin-bottom: 1rem;">
-                                    <span class="btn-text">Сканувати</span>
-                                    <span class="btn-loader hidden"><span class="spinner"></span></span>
-                                </button>
-                            </div>
-                            <div id="sitemapStatus" class="status-message hidden"
-                                style="margin-top: 0.5rem; font-size: 0.9rem;"></div>
-                        </div>
-
-                        <!-- Step 1: Generate Brief -->
-                        <div id="aiStep1" class="ai-step">
-                            <div class="step-header">
-                                <span class="step-number">1</span>
-                                <h3>Генерація Брифу</h3>
-                            </div>
-                            <p>ШІ проаналізує TOP-10 і створить ідеальну структуру статті.</p>
-                            <button class="btn btn-primary" onclick="generateBrief()">
-                                <span class="btn-text">Згенерувати Бриф</span>
-                                <span class="btn-loader hidden">
-                                    <span class="spinner"></span>
-                                    Аналізую...
-                                </span>
-                            </button>
-                        </div>
-
-                        <!-- Step 2: Review Brief (Hidden initially) -->
-                        <div id="aiStep2" class="ai-step hidden">
-                            <div class="step-header">
-                                <span class="step-number">2</span>
-                                <h3>Перевірка Брифу</h3>
-                            </div>
-                            <div class="brief-editor">
-                                <textarea id="briefEditor" class="content-editor"
-                                    style="height: 300px; font-family: monospace;"></textarea>
-                            </div>
-
-                            <div class="form-group" style="margin: 1rem 0;">
-                                <label class="checkbox-label"
-                                    style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                    <input type="checkbox" id="useCoachCheckbox">
-                                    <span>🤖 Врахувати рекомендації SEO Coach</span>
-                                </label>
-                            </div>
-
-                            <div class="form-group" style="margin: 1rem 0;">
-                                <label class="checkbox-label"
-                                    style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                    <input type="checkbox" id="generateImagesCheckbox" checked>
-                                    <span>🎨 Генерувати зображення (AI Imagen)</span>
-                                </label>
-                                <small
-                                    style="display: block; margin-left: 1.75rem; color: var(--text-secondary); font-size: 0.875rem;">
-                                    Автоматично створить 3 релевантних зображення для статті
-                                </small>
-                            </div>
-
-                            <div class="step-actions">
-                                <button class="btn btn-secondary" onclick="resetAiSteps()">Назад</button>
-                                <button class="btn btn-primary" onclick="generateArticle()">
-                                    <span class="btn-text">Написати Статтю</span>
-                                    <span class="btn-loader hidden">
-                                        <span class="spinner"></span>
-                                        Пишу...
-                                    </span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Step 3: Result (Hidden initially) -->
-                        <div id="aiStep3" class="ai-step hidden">
-                            <div class="step-header">
-                                <span class="step-number">3</span>
-                                <h3>Готово!</h3>
-                            </div>
-                            <p>Стаття успішно згенерована.</p>
-
-                            <!-- Article Preview -->
-                            <div class="article-preview"
-                                style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 1.5rem; margin: 1rem 0; max-height: 400px; overflow-y: auto;">
-                                <h4 style="margin-top: 0; color: var(--accent);">📄 Попередній перегляд</h4>
-                                <div id="articlePreview"
-                                    style="background: white; color: #1a1a1a; padding: 2rem; border-radius: 4px; font-family: Georgia, serif; line-height: 1.6;">
-                                    <style>
-                                        #articlePreview h1,
-                                        #articlePreview h2,
-                                        #articlePreview h3,
-                                        #articlePreview h4,
-                                        #articlePreview h5,
-                                        #articlePreview h6 {
-                                            color: #1a1a1a !important;
-                                        }
-
-                                        #articlePreview p,
-                                        #articlePreview li {
-                                            color: #333 !important;
-                                        }
-                                    </style>
-                                </div>
-                            </div>
-
-                            <div class="step-actions">
-                                <button class="btn btn-secondary" onclick="togglePreview()">
-                                    <span id="previewToggle">Показати HTML</span>
-                                </button>
-                                <button class="btn btn-primary" onclick="copyToEditor()">
-                                    Перенести в Редактор
-                                </button>
-                            </div>
-
-                            <!-- HTML Code (hidden by default) -->
-                            <textarea id="htmlCode" class="content-editor hidden"
-                                style="height: 300px; font-family: monospace; margin-top: 1rem;"></textarea>
-                        </div>
-                    </div>
-
-                    <!-- Iteration Panel (Modal) -->
-                    <div class="iteration-modal hidden" id="iterationModal">
-                        <div class="iteration-content">
-                            <div class="iteration-header">
-                                <h3>🔄 Ітеративне покращення</h3>
-                                <button class="close-btn" onclick="closeIterationModal()">✕</button>
-                            </div>
-
-                            <div class="iteration-progress">
-                                <div class="progress-info">
-                                    <span class="score-tracker" id="iterationScoreTracker">54 → 85</span>
-                                    <span class="iteration-counter" id="iterationCounter">Крок 0/5</span>
-                                </div>
-                                <div class="progress-bar-container">
-                                    <div class="progress-bar-fill" id="iterationProgressBar" style="width: 0%"></div>
-                                </div>
-                            </div>
-
-                            <div class="iteration-steps" id="iterationSteps">
-                                <!-- Steps will be added dynamically -->
-                            </div>
-
-                            <div class="iteration-actions">
-                                <button class="btn btn-secondary" onclick="stopIteration()" id="stopIterationBtn">
-                                    <span class="btn-text">⏸️ Зупинити</span>
-                                </button>
-                                <button class="btn btn-primary hidden" onclick="closeIterationModal()"
-                                    id="doneIterationBtn">
-                                    <span class="btn-text">✅ Готово</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </main>
 
-    <!-- Toast Notifications -->
-    <div class="toast-container" id="toastContainer"></div>
-
-    <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <p>
-                SEO Аналізатор v1.0 |
-                <a href="https://github.com/prodan655-png/SEO_Machine_2" target="_blank">GitHub</a>
+            <p>SEO Machine v2.0 | <a href="https://github.com/prodan655-png/SEO_Machine_2" target="_blank">GitHub</a>
             </p>
         </div>
     </footer>
 
-    <script src="diff-tracking.js"></script>
-    <script src="keyword-highlighting.js"></script>
-    <script src="surfer-integration.js"></script>
-    <script src="app.js"></script>
+    <!-- Scripts -->
+    <script src="js/api.js"></script>
+    <script src="components/header.js"></script>
+    <script src="js/dashboard.js?v=2"></script>
 </body>
 
 </html>
