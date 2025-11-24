@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEO Аналізатор - SurferSEO UI</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="layout-redesign.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <h1>🔍 SEO Аналізатор</h1>
+                    <p class="tagline">SurferSEO Interface Demo</p>
+                </div>
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <a href="index.html" class="btn btn-secondary">← Назад до основного UI</a>
+                    <div class="api-status">
+                        <span class="status-dot" style="background: #10b981;"></span>
+                        <span class="status-text">Ready</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content - 3 Column Layout -->
+    <main class="main" style="padding: 0;">
+        <div class="surfer-layout">
+            <!-- LEFT COLUMN: Workflow Sidebar -->
+            <aside class="workflow-sidebar">
+                <h3>WORKFLOW</h3>
+
+                <!-- Get Started -->
+                <div class="workflow-step">
+                    <div class="workflow-step-header completed">
+                        <div class="workflow-step-icon">🎯</div>
+                        <div class="workflow-step-title">Get Started</div>
+                    </div>
+                    <ul class="workflow-actions">
+                        <li class="workflow-action">
+                            <button class="workflow-action-btn completed">
+                                📊 View Competitors
+                                <span class="check-icon">✓</span>
+                            </button>
+                        </li>
+                        <li class="workflow-action">
+                            <button class="workflow-action-btn completed">
+                                📋 Generate Outline
+                                <span class="check-icon">✓</span>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Write & Optimize -->
+                <div class="workflow-step">
+                    <div class="workflow-step-header active">
+                        <div class="workflow-step-icon">✍️</div>
+                        <div class="workflow-step-title">Write & Optimize</div>
+                    </div>
+                    <ul class="workflow-actions">
+                        <li class="workflow-action">
+                            <button class="workflow-action-btn">🤖 AI Writer</button>
+                        </li>
+                        <li class="workflow-action">
+                            <button class="workflow-action-btn">⚡ Auto-Optimize</button>
+                        </li>
+                        <li class="workflow-action">
+                            <button class="workflow-action-btn">🔄 Iterate Content</button>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Review -->
+                <div class="workflow-step">
+                    <div class="workflow-step-header">
+                        <div class="workflow-step-icon">🔍</div>
+                        <div class="workflow-step-title">Review</div>
+                    </div>
+                    <ul class="workflow-actions">
+                        <li class="workflow-action">
+                            <button class="workflow-action-btn">📊 Check Score</button>
+                        </li>
+                        <li class="workflow-action">
+                            <button class="workflow-action-btn">🎓 SEO Coach</button>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Publish -->
+                <div class="workflow-step">
+                    <div class="workflow-step-header">
+                        <div class="workflow-step-icon">🚀</div>
+                        <div class="workflow-step-title">Publish</div>
+                    </div>
+                    <ul class="workflow-actions">
+                        <li class="workflow-action">
+                            <button class="workflow-action-btn">📤 Export HTML</button>
+                        </li>
+                        <li class="workflow-action">
+                            <button class="workflow-action-btn">📋 Copy Code</button>
+                        </li>
+                    </ul>
+                </div>
+            </aside>
+
+            <!-- CENTER COLUMN: Editor Area -->
+            <main class="editor-area">
+                <div class="editor-header">
+                    <h2 class="editor-title">✍️ Content Editor</h2>
+                </div>
+
+                <div class="editor-toolbar">
+                    <button class="toolbar-btn active">💻 HTML</button>
+                    <button class="toolbar-btn">📄 Preview</button>
+                    <button class="toolbar-btn">📝 Markdown</button>
+                </div>
+
+                <!-- HTML Editor -->
+                <div class="editor-container">
+                    <textarea id="draftContent" class="content-editor" placeholder="Вставте ваш HTML або текст..."
+                        style="min-height: 500px;">Це демо SurferSEO інтерфейсу з 3 колонками.
+
+Ліворуч - Workflow sidebar з кроками робочого процесу
+В центрі - Editor для редагування контенту  
+Справа - Guidelines sidebar з оцінкою та рекомендаціями
+
+Всі елементи UI вже готові!</textarea>
+                    <div class="editor-stats"
+                        style="margin-top: 1rem; padding: 0.5rem; background: rgba(59, 130, 246, 0.1); border-radius: 4px;">
+                        <span>Слів: <strong id="wordCount">15</strong></span>
+                        <span style="margin-left: 2rem;">Символів: <strong id="charCount">250</strong></span>
+                    </div>
+                </div>
+            </main>
+
+            <!-- RIGHT COLUMN: Guidelines Sidebar -->
+            <aside class="guidelines-sidebar">
+                <div class="guidelines-header">
+                    <h3 class="guidelines-title">📋 Guidelines</h3>
+                </div>
+
+                <!-- Content Score Widget -->
+                <div class="score-widget">
+                    <div class="score-circle-small">
+                        <svg viewBox="0 0 120 120">
+                            <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(30, 41, 59, 0.6)"
+                                stroke-width="8" />
+                            <circle cx="60" cy="60" r="54" fill="none" stroke="url(#gradient)" stroke-width="8"
+                                stroke-dasharray="339" stroke-dashoffset="84.75" stroke-linecap="round" />
+                            <defs>
+                                <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#60a5fa" />
+                                    <stop offset="100%" style="stop-color:#3b82f6" />
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        <div class="score-value-small">75</div>
+                    </div>
+                    <span class="score-label-small">CONTENT SCORE</span>
+                </div>
+
+                <!-- Auto-Optimize Button -->
+                <button class="auto-optimize-btn">⚡ Auto-Optimize</button>
+
+                <!-- Important Terms -->
+                <div class="guidelines-section">
+                    <h4 class="guidelines-section-title">
+                        <span class="icon">🔑</span>
+                        Important Terms
+                    </h4>
+                    <ul class="terms-list">
+                        <li class="term-item good">
+                            <span class="term-name">SEO оптимізація</span>
+                            <span class="term-count">5/3-7</span>
+                        </li>
+                        <li class="term-item medium">
+                            <span class="term-name">контент</span>
+                            <span class="term-count">3/4-8</span>
+                        </li>
+                        <li class="term-item low">
+                            <span class="term-name">аналіз</span>
+                            <span class="term-count">1/3-6</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Content Structure -->
+                <div class="guidelines-section">
+                    <h4 class="guidelines-section-title">
+                        <span class="icon">📊</span>
+                        Content Structure
+                    </h4>
+                    <ul class="metrics-list">
+                        <li class="metric-item">
+                            <span class="metric-label">Words</span>
+                            <div>
+                                <span class="metric-value medium">1500/1800-2500</span>
+                                <div class="metric-bar">
+                                    <div class="metric-bar-fill medium" style="width: 60%"></div>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="metric-item">
+                            <span class="metric-label">Headings</span>
+                            <div>
+                                <span class="metric-value good">8/6-10</span>
+                                <div class="metric-bar">
+                                    <div class="metric-bar-fill good" style="width: 80%"></div>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="metric-item">
+                            <span class="metric-label">Images</span>
+                            <div>
+                                <span class="metric-value low">2/4-8</span>
+                                <div class="metric-bar">
+                                    <div class="metric-bar-fill low" style="width: 25%"></div>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </aside>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>SEO Аналізатор v1.0 - SurferSEO UI Demo | <a href="https://github.com/prodan655-png/SEO_Machine_2"
+                    target="_blank">GitHub</a></p>
+        </div>
+    </footer>
+
+    <!-- Simple inline scripts for demo -->
+        <script src="surfer-app.js"></script>`r`n    <script><script>
+        console.log('✅ SurferSEO UI Demo loaded successfully');
+
+        // Simple word count
+        const textarea = document.getElementById('draftContent');
+        const wordCountEl = document.getElementById('wordCount');
+        const charCountEl = document.getElementById('charCount');
+
+        if (textarea) {
+            textarea.addEventListener('input', function () {
+                const text = this.value;
+                const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+                const chars = text.length;
+
+                if (wordCountEl) wordCountEl.textContent = words;
+                if (charCountEl) charCountEl.textContent = chars;
+            });
+        }
+    </script>
+</body>
+
+</html>
