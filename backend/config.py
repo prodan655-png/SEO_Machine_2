@@ -19,7 +19,7 @@ env_path = Path(__file__).parent.parent / env_file
 
 if env_path.exists():
     load_dotenv(env_path, override=True)
-    print(f"✓ Loaded environment from {env_file}")
+    print(f"[OK] Loaded environment from {env_file}")
     print(f"DEBUG: USE_MOCK_SERP = {os.getenv('USE_MOCK_SERP')}")
 else:
     print(f"⚠ Warning: {env_file} not found, using system environment variables")

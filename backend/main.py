@@ -29,7 +29,7 @@ from modules.guidelines_generator import generate_guidelines
 from modules.content_scorer import compute_content_score
 
 # Setup
-logger = setup_logger('api')
+logger = setup_logger('api', log_file=get_config('logging.file', 'logs/seo_analyzer.log'))
 
 # SQLite-specific connect args
 connect_args = {}

@@ -193,7 +193,7 @@ Avoid: Text, watermarks, overly complex details, stock photo look"""
         # Use a placeholder service
         colors = ['3b82f6', '10b981', 'f59e0b', 'ef4444', '8b5cf6']
         color = colors[index % len(colors)]
-        return f"https://via.placeholder.com/800x450/{color}/ffffff?text=Image+{index+1}"
+        return f"https://placehold.co/800x450/{color}/ffffff?text=Image+{index+1}"
     
     def _get_placeholder_images(self, num_images: int) -> List[Dict[str, Any]]:
         """Get placeholder images when generation is not available."""

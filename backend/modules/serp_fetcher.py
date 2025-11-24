@@ -158,15 +158,15 @@ def _fetch_serper_dev(
             # Check specific blocked sites
             for site in blocked_sites:
                 if site in domain:
-                    print(f"🚫 Blocking site: {url} (matched {site})")
+                    print(f"[BLOCK] Blocking site: {url} (matched {site})")
                     return True
                     
             return False
         except Exception as e:
-            print(f"⚠️ Error checking URL {url}: {e}")
+            print(f"[WARN] Error checking URL {url}: {e}")
             return False
     
-    print(f"🔍 SERP returned {len(organic_results)} results")
+    print(f"[SEARCH] SERP returned {len(organic_results)} results")
         
     for res in organic_results:
         print(f"  - {res.get('link', 'No link')}")
@@ -176,7 +176,7 @@ def _fetch_serper_dev(
         if not is_blocked(result.get('link', ''))
     ]
     
-    print(f"✅ After filtering: {len(filtered_results)} results")
+    print(f"[OK] After filtering: {len(filtered_results)} results")
     
     # If we filtered too many, log warning
     if len(filtered_results) < 3:
@@ -201,7 +201,7 @@ def _fetch_serper_dev(
             "domain": domain
         })
         
-    logger.info(f"✓ Fetched {len(results)} SERP results via Serper.dev")
+    logger.info(f"[OK] Fetched {len(results)} SERP results via Serper.dev")
     
     return {
         "success": True,
@@ -289,7 +289,7 @@ def _fetch_serp_real(
             if len(domains_seen) == 1 and len(results) > 5:
                 logger.warning(f"Single domain dominance detected: {list(domains_seen)[0]}")
             
-            logger.info(f"✓ Fetched {len(results)} SERP results ({len(domains_seen)} unique domains)")
+            logger.info(f"[OK] Fetched {len(results)} SERP results ({len(domains_seen)} unique domains)")
             
             return {
                 "success": True,

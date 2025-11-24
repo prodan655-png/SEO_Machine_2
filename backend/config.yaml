@@ -93,6 +93,6 @@ ai:
   retry_attempts: 3
   features:
     seo_coaching: true
-    brief_generation: false  # Phase 6.2
-    meta_tags: false  # Phase 6.3
-    content_enhancement: false  # Phase 6.4
+    brief_generation: true
+    meta_tags: true
+    content_enhancement: true
