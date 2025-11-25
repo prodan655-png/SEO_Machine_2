@@ -44,14 +44,29 @@
 
     // Check API Status
     if (window.API) {
-        window.API.checkHealth().then(isOk => {
-            const dot = document.getElementById('apiStatus');
-            const text = document.getElementById('apiStatusText');
-            if (dot && text) {
-                dot.style.background = isOk ? '#10b981' : '#ef4444';
-                text.textContent = isOk ? 'Online' : 'Offline';
-            }
-        });
+        // Use setTimeout to ensure DOM is fully ready
+        setTimeout(() => {
+            window.API.checkHealth().then(isOk => {
+                const dot = document.getElementById('apiStatus');
+                const text = document.getElementById('apiStatusText');
+                if (dot && text) {
+                    dot.style.background = isOk ? '#10b981' : '#ef4444';
+                    text.textContent = isOk ? 'Online' : 'Offline';
+                } else {
+                    console.warn('API status elements not found');
+                }
+            }).catch(err => {
+                console.error('API health check failed:', err);
+                const dot = document.getElementById('apiStatus');
+                const text = document.getElementById('apiStatusText');
+                if (dot && text) {
+                    dot.style.background = '#ef4444';
+                    text.textContent = 'Offline';
+                }
+            });
+        }, 100);
+    } else {
+        console.warn('window.API not available');
     }
 
     // Add styles for nav if not present

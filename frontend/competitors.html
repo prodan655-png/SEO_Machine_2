@@ -18,10 +18,15 @@
     <main class="main">
         <div class="container">
             <div class="header-actions"
-                style="margin: 2rem 0; display: flex; justify-content: space-between; align-items: center;">
+                style="margin: 2rem 0; display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
                 <h2>📈 Competitor Analysis <span id="comp-keyword"
                         style="font-weight: normal; font-size: 0.8em; color: var(--text-secondary);"></span></h2>
-                <a href="#" id="back-to-editor" class="btn btn-secondary">← Back to Editor</a>
+                <div style="display: flex; gap: 1rem;">
+                    <button id="btn-generate-brief" class="btn btn-primary" style="display: none;">
+                        📋 Generate Brief & Article
+                    </button>
+                    <a href="#" id="back-to-editor" class="btn btn-secondary">← Back to Editor</a>
+                </div>
             </div>
 
             <!-- Competitors Table -->
@@ -74,7 +79,7 @@
 
     <script src="js/api.js"></script>
     <script src="components/header.js"></script>
-    <script src="js/competitors.js?v=2"></script>
+    <script src="js/competitors.js?v=3"></script>
 </body>
 
 </html>

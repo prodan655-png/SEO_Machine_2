@@ -45,12 +45,37 @@ const API = {
     },
 
     // AI Tools
-    generateBrief: async (analysisId) => {
-        // Mock implementation for now as endpoint might not exist yet
-        return {
-            title: "Generated Brief",
-            structure: ["Introduction", "Main Point 1", "Main Point 2", "Conclusion"]
-        };
+    generateBrief: async (analysisId, tone = 'professional') => {
+        const response = await fetch(`${API_BASE}/api/ai/brief`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                analysis_id: analysisId,
+                tone: tone
+            })
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to generate brief');
+        }
+        return await response.json();
+    },
+
+    generateArticle: async (brief, tone = 'professional', language = 'uk') => {
+        const response = await fetch(`${API_BASE}/api/ai/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                brief: brief,
+                tone: tone,
+                language: language
+            })
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to generate article');
+        }
+        return await response.json();
     },
 
     generateImages: async (analysisId, html, numImages = 3) => {

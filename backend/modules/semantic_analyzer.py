@@ -256,10 +256,50 @@ def calculate_term_ranges(
     Returns:
         List of terms with min/max recommendations
     """
+    # Load stop words and irrelevant terms for filtering
+    # Infer language from first term (if any) or default to 'en'
+    # For now, we'll try to load both en and uk stop words
+    from pathlib import Path
+    
+    stop_words = set()
+    for lang in ['en', 'uk']:
+        stop_words_path = Path(__file__).parent.parent / 'stop_words'
+        stop_words_file = stop_words_path / f"{lang}.txt"
+        
+        if stop_words_file.exists():
+            with open(stop_words_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        stop_words.add(line.strip().lower())
+    
+    # Additional irrelevant terms
+    irrelevant_terms = {
+        'your', 'you', 'their', 'this', 'that', 'these', 'those',
+        'can', 'will', 'may', 'might', 'should', 'would', 'could',
+        'here', 'there', 'where', 'when', 'what', 'how', 'why',
+        'all', 'any', 'some', 'many', 'much', 'few', 'more', 'most',
+        'very', 'really', 'quite', 'just', 'only', 'also', 'even',
+        'debug', 'test', 'example', 'sample', 'demo', 'placeholder',
+        'lorem', 'ipsum', 'click', 'button', 'link', 'page', 'website'
+    }
+    stop_words.update(irrelevant_terms)
+    
+    logger.debug(f"Loaded {len(stop_words)} stop words/irrelevant terms for filtering")
+    
     results = []
     
     for term_dict in terms:
         term = term_dict['term_normalized']
+        
+        # Filter out stop words and irrelevant terms
+        if term.lower() in stop_words:
+            logger.debug(f"Filtering out stop word/irrelevant term: '{term}'")
+            continue
+        
+        # Filter out single characters and purely numeric terms
+        if len(term) <= 1 or term.isdigit():
+            logger.debug(f"Filtering out short/numeric term: '{term}'")
+            continue
         
         # Count occurrences in each competitor
         occurrences = []
@@ -271,7 +311,9 @@ def calculate_term_ranges(
         
         # Skip terms that don't appear in enough documents
         # Adjust threshold based on number of competitors
-        min_docs = min(get_config('semantic_analyzer.min_docs_used_in', 2), max(1, len(competitor_texts) // 2))
+        # Use 30% of competitors or config value, but at least 1
+        min_docs_calc = max(1, int(len(competitor_texts) * 0.3))
+        min_docs = min(get_config('semantic_analyzer.min_docs_used_in', 2), min_docs_calc)
         docs_used_in = len([c for c in occurrences if c > 0])
         
         if docs_used_in < min_docs:
@@ -405,15 +447,19 @@ def analyze_competitors(
     
     # Compute TF-IDF terms
     tfidf_terms = compute_tfidf_terms(texts, language, {})
+    logger.info(f"Computed {len(tfidf_terms)} TF-IDF terms")
     
     # Extract NLP entities
     entities = extract_nlp_entities(texts, language)
+    logger.info(f"Extracted {len(entities)} NLP entities")
     
     # Merge and rank
     top_terms = merge_and_rank_terms(tfidf_terms, entities, {})
+    logger.info(f"Merged into {len(top_terms)} top terms")
     
     # Calculate ranges
     terms_with_ranges = calculate_term_ranges(top_terms, texts, serp_weights)
+    logger.info(f"Final terms with ranges: {len(terms_with_ranges)}")
     
     return terms_with_ranges
 

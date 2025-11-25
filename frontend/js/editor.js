@@ -60,6 +60,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         else showToast('⚠️ Save analysis first', 'warning');
     });
 
+    document.getElementById('btn-generate-brief')?.addEventListener('click', async () => {
+        if (!analysisId) {
+            showToast('⚠️ Analysis ID required', 'warning');
+            return;
+        }
+
+        showToast('📋 Generating brief...', 'info');
+
+        try {
+            const brief = await window.API.generateBrief(analysisId, 'professional');
+            console.log('Brief generated:', brief);
+
+            // Display brief in modal
+            showBriefModal(brief);
+            showToast('✅ Brief generated!', 'success');
+
+        } catch (error) {
+            console.error('Brief generation error:', error);
+            if (error.message.includes('AI features') || error.message.includes('503')) {
+                showToast('❌ AI features disabled. Check backend config.', 'error');
+            } else {
+                showToast(`❌ ${error.message}`, 'error');
+            }
+        }
+    });
+
     document.getElementById('btn-check-score')?.addEventListener('click', () => {
         performScoring(els.editor.value);
     });
@@ -224,5 +250,60 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
         container.appendChild(toast);
         setTimeout(() => toast.remove(), 3000);
+    }
+
+    function showBriefModal(brief) {
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7); display: flex;
+            align-items: center; justify-content: center; z-index: 10000;
+        `;
+
+        const content = document.createElement('div');
+        content.style.cssText = `
+            background: var(--bg-secondary, #1e293b); border-radius: 12px;
+            padding: 2rem; max-width: 800px; width: 90%; max-height: 80vh;
+            overflow-y: auto; position: relative;
+        `;
+
+        content.innerHTML = `
+            <h2 style="color: var(--text-primary, #fff); margin-bottom: 1rem;">📋 Generated Brief</h2>
+            <button id="closeBriefModal" style="position: absolute; top: 1rem; right: 1rem; background: transparent; border: none; color: #888; cursor: pointer; font-size: 1.5rem;">✕</button>
+            <div style="background: #0f172a; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; white-space: pre-wrap; font-family: monospace; color: #cbd5e1; max-height: 400px; overflow-y: auto;">
+${JSON.stringify(brief, null, 2)}
+            </div>
+            <div style="display: flex; gap: 1rem;">
+                <button id="generateArticleBtn" class="btn btn-primary" style="flex: 1;">✍️ Generate Article</button>
+                <button id="copyBriefBtn" class="btn btn-secondary" style="flex: 1;">📋 Copy Brief</button>
+            </div>
+        `;
+
+        modal.appendChild(content);
+        document.body.appendChild(modal);
+
+        document.getElementById('closeBriefModal').onclick = () => modal.remove();
+        document.getElementById('copyBriefBtn').onclick = () => {
+            navigator.clipboard.writeText(JSON.stringify(brief, null, 2));
+            showToast('✅ Copied!', 'success');
+        };
+
+        document.getElementById('generateArticleBtn').onclick = async () => {
+            modal.remove();
+            showToast('✍️ Generating article...', 'info');
+            try {
+                const result = await window.API.generateArticle(brief, 'professional', 'uk');
+                if (result.article) {
+                    els.editor.value = result.article;
+                    updateStats(result.article);
+                    showToast('✅ Article generated!', 'success');
+                    if (analysisId) await performScoring(result.article);
+                }
+            } catch (error) {
+                showToast(`❌ ${error.message}`, 'error');
+            }
+        };
+
+        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
     }
 });

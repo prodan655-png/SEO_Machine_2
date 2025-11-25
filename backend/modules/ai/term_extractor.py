@@ -84,14 +84,22 @@ async def extract_terms_with_ai(
         ai_client = get_ai_client()
         logger.info(f"Extracting terms with AI for keyword '{keyword}'")
         
-        response = await ai_client.generate_content(
-            prompt,
-            temperature=0.3,  # Lower temperature for more consistent results
-            max_tokens=2000
+        import asyncio
+        logger.debug("Calling AI client generate_content...")
+        # Add 30s timeout
+        response = await asyncio.wait_for(
+            ai_client.generate_content(
+                prompt,
+                temperature=0.3,  # Lower temperature for more consistent results
+                max_tokens=2000
+            ),
+            timeout=30.0
         )
+        logger.debug("AI client returned response.")
         
         # Parse JSON response
         response_text = response.strip()
+        logger.debug(f"Raw AI response (first 100 chars): {response_text[:100]}...")
         
         # Remove markdown code blocks if present
         if response_text.startswith('```json'):
@@ -102,15 +110,47 @@ async def extract_terms_with_ai(
             response_text = response_text[:-3]
         response_text = response_text.strip()
         
+        logger.debug("Parsing JSON...")
+        
         result = json.loads(response_text)
         terms = result.get('terms', [])
+        
+        # Load stop words for filtering
+        from pathlib import Path
+        stop_words_path = Path(__file__).parent.parent.parent / 'stop_words'
+        stop_words_file = stop_words_path / f"{language}.txt"
+        
+        stop_words = set()
+        if stop_words_file.exists():
+            with open(stop_words_file, 'r', encoding='utf-8') as f:
+                stop_words = {line.strip().lower() for line in f if line.strip()}
+        
+        # Additional common technical/irrelevant terms to filter
+        technical_terms = {
+            'debug', 'debugging', 'color', 'test', 'testing', 'example', 
+            'sample', 'demo', 'placeholder', 'lorem', 'ipsum', 'click',
+            'button', 'link', 'page', 'website', 'site', 'web', 'http',
+            'https', 'www', 'com', 'html', 'css', 'javascript', 'js'
+        }
+        stop_words.update(technical_terms)
         
         # Format for compatibility with existing system
         formatted_terms = []
         for term_data in terms:
+            term_lower = term_data['term'].lower()
+            
+            # Skip if term is a stop word or single character
+            if term_lower in stop_words or len(term_lower) <= 1:
+                logger.debug(f"Filtering out stop word/technical term: {term_data['term']}")
+                continue
+            
+            # Skip if term is purely numeric
+            if term_lower.replace('.', '').replace(',', '').isdigit():
+                continue
+                
             formatted_terms.append({
                 'term': term_data['term'],
-                'term_normalized': term_data['term'].lower(),
+                'term_normalized': term_lower,
                 'type': term_data.get('type', 'phrase'),
                 'min_recommended': term_data.get('min_recommended', 3),
                 'max_recommended': term_data.get('max_recommended', 8),
@@ -121,7 +161,7 @@ async def extract_terms_with_ai(
                 'ai_relevance': term_data.get('relevance', '')
             })
         
-        logger.info(f"AI extracted {len(formatted_terms)} terms")
+        logger.info(f"AI extracted {len(formatted_terms)} terms (filtered from {len(terms)} raw terms)")
         return formatted_terms
         
     except json.JSONDecodeError as e:

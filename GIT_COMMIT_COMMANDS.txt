@@ -1,0 +1,33 @@
+# Git Commit Commands
+# Виконайте ці команди в PowerShell в корені проекту
+
+# 1. Перевірити що змінилося
+git status
+
+# 2. Додати всі зміни
+git add .
+
+# 3. Закомітити з детальним повідомленням
+git commit -m "feat: Add Generate Brief functionality with AI/Mock fallback
+
+- Added Generate Brief button to competitors and editor pages
+- Implemented real API call in api.js (replaced mock)
+- Added showBriefModal() for displaying brief in modal
+- Integrated article generation from brief
+- Added fallback mock brief when AI is disabled/fails
+- Improved error handling and user feedback
+- Updated script versions for cache busting (v=3, v=7)
+
+Files changed:
+- frontend/competitors.html
+- frontend/js/competitors.js
+- frontend/editor.html
+- frontend/js/editor.js
+- frontend/js/api.js
+- backend/main.py"
+
+# 4. Запушити на GitHub
+git push origin main
+
+# Якщо виникне помилка з upstream:
+# git push --set-upstream origin main

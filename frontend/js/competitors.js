@@ -7,7 +7,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         compBody: document.getElementById('competitorsBody'),
         termsBody: document.getElementById('termsBody'),
         keywordDisplay: document.getElementById('comp-keyword'),
-        backBtn: document.getElementById('back-to-editor')
+        backBtn: document.getElementById('back-to-editor'),
+        briefBtn: document.getElementById('btn-generate-brief')
     };
 
     if (analysisId) {
@@ -15,6 +16,38 @@ document.addEventListener('DOMContentLoaded', async () => {
         // We need to fetch analysis to get the keyword for the link if possible, 
         // but for now just link to ID. Editor will handle missing keyword via API fetch if needed.
         els.backBtn.href = `editor.html?id=${analysisId}`;
+
+        // Show brief button and set up handler
+        els.briefBtn.style.display = 'block';
+        els.briefBtn.addEventListener('click', () => {
+            // Save analysis ID to localStorage for easy access
+            localStorage.setItem('current_analysis_id', analysisId);
+
+            // Show toast notification
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #10b981;
+                color: white;
+                padding: 1rem 1.5rem;
+                border-radius: 8px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                z-index: 9999;
+                font-weight: 500;
+            `;
+            toast.textContent = 'Analysis ID saved! Now you can use AI Writer features.';
+            document.body.appendChild(toast);
+
+            setTimeout(() => toast.remove(), 3000);
+
+            // Redirect to main page where all features are available
+            // User can navigate to AI Writer or other features from there
+            setTimeout(() => {
+                window.location.href = `index.html`;
+            }, 1000);
+        });
 
         // Start polling/loading
         startPolling(analysisId);

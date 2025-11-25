@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEO Аналізатор</title>
+    <script>
+        // Inline script to add toggle button dynamically
+        document.addEventListener('DOMContentLoaded', function () {
+            const scoringTab = document.getElementById('scoringTab');
+            if (!scoringTab) return;
+
+            const toggleBtn = document.createElement('div');
+            toggleBtn.style.cssText = 'display: flex; justify-content: flex-end; margin-bottom: 1rem;';
+            toggleBtn.innerHTML = '<button id="uiModeToggle" class="btn btn-secondary" style="display: flex; align-items: center; gap: 0.5rem;"><span id="uiModeIcon">🎨</span><span id="uiModeText">Режим SurferSEO</span></button>';
+
+            scoringTab.insertBefore(toggleBtn, scoringTab.firstChild);
+
+            document.getElementById('uiModeToggle').onclick = function () {
+                const currentMode = localStorage.getItem('uiMode') || 'classic';
+                const newMode = currentMode === 'classic' ? 'surfer' : 'classic';
+                localStorage.setItem('uiMode', newMode);
+
+                const iconEl = document.getElementById('uiModeIcon');
+                const textEl = document.getElementById('uiModeText');
+                const classicUI = scoringTab.querySelector('.scoring-layout');
+
+                if (newMode === 'surfer') {
+                    iconEl.textContent = '📝';
+                    textEl.textContent = 'Класичний режим';
+                    if (classicUI) classicUI.style.display = 'none';
+                    if (typeof window.initSurferLayout === 'function') {
+                        setTimeout(() => window.initSurferLayout(), 100);
+                    }
+                } else {
+                    iconEl.textContent = '🎨';
+                    textEl.textContent = 'Режим SurferSEO';
+                    if (classicUI) classicUI.style.display = '';
+                    const surferContainer = scoringTab.querySelector('.surfer-layout');
+                    if (surferContainer && surferContainer !== classicUI) {
+                        surferContainer.remove();
+                    }
+                }
+            };
+        });
+    </script>
+</head>
+
+<body>
+    <p>This is a placeholder HTML head. The actual index.html should be restored from Git.</p>
+</body>
+
+</html>

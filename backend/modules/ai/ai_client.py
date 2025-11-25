@@ -66,7 +66,7 @@ class GeminiClient:
                 max_output_tokens=max_tokens or self.max_tokens
             )
             
-            response = model.generate_content(
+            response = await model.generate_content_async(
                 prompt,
                 generation_config=generation_config
             )

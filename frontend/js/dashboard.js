@@ -31,9 +31,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 console.log('Analysis created:', result);
 
+                const analysisId = result.id;
+                console.log('About to redirect with id:', analysisId);
+                console.log('Full result object:', JSON.stringify(result));
+                const redirectUrl = `competitors.html?id=${analysisId}`;
+                console.log('Redirect URL:', redirectUrl);
+
                 // Save to History
                 saveToHistory({
-                    id: result.analysis_id,
+                    id: analysisId,
                     keyword: keyword,
                     date: new Date().toISOString(),
                     status: 'processing'
@@ -41,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Redirect to Competitors (as requested by user)
                 // They want to see competitors first
-                window.location.href = `competitors.html?id=${result.analysis_id}`;
+                window.location.href = redirectUrl;
 
             } catch (error) {
                 console.error('Analysis failed:', error);

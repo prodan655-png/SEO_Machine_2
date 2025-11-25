@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="SEO Аналізатор - SurferSEO UI">
+    <title>SEO Аналізатор - SurferSEO Mode</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="layout-redesign.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <h1>🔍 SEO Аналізатор</h1>
+                    <p class="tagline">Професійний аналіз контенту для TOP-10 (SurferSEO Mode)</p>
+                </div>
+                <div class="api-status">
+                    <span class="status-dot" id="apiStatus"></span>
+                    <span class="status-text" id="apiStatusText">Перевірка...</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- Back to Classic Button -->
+            <div style="margin-bottom: 1rem;">
+                <a href="index.html" class="btn btn-secondary"
+                    style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                    ← Назад до класичного UI
+                </a>
+            </div>
+
+            <!-- SurferSEO Layout Container -->
+            <div id="scoringTab">
+                <!-- This will be populated by surfer-integration.js -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>
+                <!DOCTYPE html>
+                <html lang="uk">
+
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <meta name="description" content="SEO Аналізатор - SurferSEO UI">
+                    <title>SEO Аналізатор - SurferSEO Mode</title>
+                    <link rel="stylesheet" href="styles.css">
+                    <link rel="stylesheet" href="layout-redesign.css">
+                    <link rel="preconnect" href="https://fonts.googleapis.com">
+                    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+                    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+                        rel="stylesheet">
+                </head>
+
+                <body>
+                    <!-- Header -->
+                    <header class="header">
+                        <div class="container">
+                            <div class="header-content">
+                                <div class="logo">
+                                    <h1>🔍 SEO Аналізатор</h1>
+                                    <p class="tagline">Професійний аналіз контенту для TOP-10 (SurferSEO Mode)</p>
+                                </div>
+                                <div class="api-status">
+                                    <span class="status-dot" id="apiStatus"></span>
+                                    <span class="status-text" id="apiStatusText">Перевірка...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    <!-- Main Content -->
+                    <main class="main">
+                        <div class="container">
+                            <!-- Back to Classic Button -->
+                            <div style="margin-bottom: 1rem;">
+                                <a href="index.html" class="btn btn-secondary"
+                                    style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                                    ← Назад до класичного UI
+                                </a>
+                            </div>
+
+                            <!-- SurferSEO Layout Container -->
+                            <div id="scoringTab">
+                                <!-- This will be populated by surfer-integration.js -->
+                            </div>
+                        </div>
+                    </main>
+
+                    <!-- Toast Notifications -->
+                    <div class="toast-container" id="toastContainer"></div>
+
+                    <!-- Footer -->
+                    <footer class="footer">
+                        <div class="container">
+                            <p>
+                                SEO Аналізатор v1.0 (SurferSEO Mode) |
+                                <a href="https://github.com/prodan655-png/SEO_Machine_2" target="_blank">GitHub</a>
+                            </p>
+                        </div>
+                    </footer>
+
+                    <script src="diff-tracking.js"></script>
+                    <script src="keyword-highlighting.js"></script>
+                    <script src="app.js"></script>
+                    <script src="surfer-integration.js"></script>
+                    <script>
+                        // Wait for all scripts to load, then initialize
+                        window.addEventListener('load', function () {
+                            console.log('Page fully loaded, checking for initSurferLayout...');
+                            if (typeof window.initSurferLayout === 'function') {
+                                window.initSurferLayout();
+                                console.log('✅ SurferSEO layout initialized from page load');
+                            } else {
+                                console.error('❌ initSurferLayout function not found on window object');
+                                console.log('Available on window:', Object.keys(window).filter(k => k.includes('init') || k.includes('Surfer')));
+                            }
+                        });
+                    </script>
+                </body>
+
+                </html>

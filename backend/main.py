@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import DATABASE_URL, ALLOWED_ORIGINS, get_config
 from database import Base, SessionLocal, Analysis, Competitor, Term, Guideline, Draft, AnalysisStatus, get_db
 from logger import setup_logger
+from models import CompetitorToggleRequest
 from modules.serp_fetcher import fetch_serp
 from modules.content_extractor import batch_extract_competitors
 from modules.semantic_analyzer import analyze_competitors
@@ -78,24 +79,24 @@ class AnalysisCreateRequest(BaseModel):
     device: str = Field(default="desktop", pattern="^(desktop|mobile)$")
 
 
-class AnalysisCreateResponse(BaseModel):
-    analysis_id: str
-    status: str
-
-
-class ScoreDraftRequest(BaseModel):
-    text: str = Field(..., min_length=1)
-    format: str = Field(default="html", pattern="^(html|markdown)$")
-
-
-class ToggleCompetitorRequest(BaseModel):
-    competitor_url: str
-    enabled: bool
-
-
 class HealthResponse(BaseModel):
     status: str
     timestamp: str
+
+
+class AnalysisCreateResponse(BaseModel):
+    id: str
+    keyword: str
+    status: str
+    language: str
+    location: str
+    device: str
+    created_at: str
+
+
+class ScoreDraftRequest(BaseModel):
+    content: str = Field(..., min_length=1)
+    format: str = Field(default="html", pattern="^(html|markdown)$")
 
 
 # Background task function
@@ -179,10 +180,16 @@ async def process_analysis_task(analysis_id: str):
         
         # Use AI-powered term extraction
         from modules.semantic_analyzer import analyze_competitors_with_ai
+        logger.info(f"Starting AI-powered term extraction for {len(extracted_data)} competitors")
         terms_data = await analyze_competitors_with_ai(extracted_data, analysis.keyword, analysis.language)
+        logger.info(f"Term extraction returned {len(terms_data)} terms")
+        
+        if not terms_data:
+            logger.warning(f"No terms extracted for analysis {analysis_id}! This will result in empty Keyword Statistics.")
         
         # Step 5: Save terms to database
         for term_info in terms_data:
+            logger.debug(f"Saving term: {term_info.get('term', 'N/A')}")
             term = Term(
                 analysis_id=analysis_id,
                 term=term_info['term'],
@@ -198,6 +205,7 @@ async def process_analysis_task(analysis_id: str):
             db.add(term)
         
         db.commit()
+        logger.info(f"Saved {len(terms_data)} terms to database for analysis {analysis_id}")
         
         # Step 6: Generate guidelines
         guidelines_data = generate_guidelines(extracted_data, position_weights)
@@ -274,11 +282,16 @@ async def create_analysis(
         import asyncio
         asyncio.create_task(process_analysis_task(analysis_id))
         
-        logger.info(f"Created analysis {analysis_id} for keyword '{request.keyword}''")
+        logger.info(f"Created analysis {analysis_id} for keyword '{request.keyword}'")
         
         return AnalysisCreateResponse(
-            analysis_id=analysis_id,
-            status='processing'
+            id=analysis_id,
+            keyword=request.keyword,
+            language=request.language,
+            location=request.location,
+            device=request.device,
+            status='processing',
+            created_at=datetime.utcnow().isoformat()
         )
         
     except Exception as e:
@@ -391,21 +404,42 @@ async def score_draft(analysis_id: str, request: ScoreDraftRequest):
                 detail=f"Analysis {analysis_id} not found"
             )
         
-        if analysis.status != 'completed':
+        # Allow scoring even if analysis is still processing
+        # If data not ready, return basic score
+        if analysis.status not in ['completed', 'processing']:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Analysis is not completed yet (status: {analysis.status})"
+                detail=f"Analysis failed or is in invalid state (status: {analysis.status})"
             )
         
         # Get terms and guidelines
         terms = db.query(Term).filter(Term.analysis_id == analysis_id).all()
         guideline = db.query(Guideline).filter(Guideline.analysis_id == analysis_id).first()
         
+        # If analysis still processing, return basic score with fallback
         if not terms or not guideline:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Analysis data is incomplete"
+            logger.warning(f"Analysis {analysis_id} data incomplete, returning basic score")
+            # Return basic scoring without competitor data
+            from backend.modules.content_scorer import ContentScorer
+            scorer = ContentScorer()
+            
+            # Basic score without guidelines
+            result = scorer.score_content(
+                content=request.content,
+                terms_data=[],  # Empty - will use basic term extraction
+                guidelines={
+                    "word_count": {"min": 1000, "max": 2000, "median": 1500},
+                    "headings": {"min": 5, "max": 10, "median": 7}
+                }
             )
+            
+            return {
+                "total_score": result.get("total_score", 50),
+                "term_details": result.get("term_details", []),
+                "structure_details": result.get("structure_details", {}),
+                "headings_details": result.get("headings_details", {}),
+                "message": "Analysis still processing. Showing basic score."
+            }
         
         # Format data for scorer - flat structure required
         terms_data = [
@@ -452,35 +486,38 @@ async def score_draft(analysis_id: str, request: ScoreDraftRequest):
 
 
 @app.put("/api/analysis/{analysis_id}/competitors")
-async def toggle_competitor(analysis_id: str, request: ToggleCompetitorRequest):
+async def toggle_competitor(analysis_id: str, request: CompetitorToggleRequest):
     """
-    Enable or disable a competitor from analysis.
+    Enable or disable competitors from analysis.
     """
     db: Session = SessionLocal()
     
     try:
-        # Get competitor
-        competitor = db.query(Competitor).filter(
-            Competitor.analysis_id == analysis_id,
-            Competitor.url == request.competitor_url
-        ).first()
+        updated_competitors = []
         
-        if not competitor:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Competitor not found"
-            )
+        # Update each competitor in the list
+        for competitor_url in request.competitor_urls:
+            competitor = db.query(Competitor).filter(
+                Competitor.analysis_id == analysis_id,
+                Competitor.url == competitor_url
+            ).first()
+            
+            if competitor:
+                competitor.is_enabled = request.enabled
+                updated_competitors.append({
+                    "url": competitor.url,
+                    "enabled": competitor.is_enabled
+                })
+                logger.info(f"Toggled competitor {competitor_url} to {request.enabled}")
+            else:
+                logger.warning(f"Competitor {competitor_url} not found for analysis {analysis_id}")
         
-        # Update enabled status
-        competitor.is_enabled = request.enabled
         db.commit()
         
-        logger.info(f"Toggled competitor {request.competitor_url} to {request.enabled}")
-        
         return {
-            "url": competitor.url,
-            "enabled": competitor.is_enabled,
-            "message": f"Competitor {'enabled' if request.enabled else 'disabled'}"
+            "updated": updated_competitors,
+            "count": len(updated_competitors),
+            "message": f"Updated {len(updated_competitors)} competitor(s)"
         }
         
     finally:
@@ -614,41 +651,84 @@ async def generate_content_brief(request: BriefRequest):
     Generate content brief based on analysis.
     """
     from config import get_config
-    if not get_config('ai.enabled', False):
-        raise HTTPException(status_code=503, detail="AI features disabled")
-        
+    
     db: Session = SessionLocal()
     try:
         analysis = db.query(Analysis).filter(Analysis.id == request.analysis_id).first()
         if not analysis:
             raise HTTPException(status_code=404, detail="Analysis not found")
-            
+        
         # Get data
         terms = db.query(Term).filter(Term.analysis_id == request.analysis_id).all()
         guideline = db.query(Guideline).filter(Guideline.analysis_id == request.analysis_id).first()
-        competitors = db.query(Competitor).filter(
-            Competitor.analysis_id == request.analysis_id,
-            Competitor.is_enabled == True
-        ).all()
         
-        # Format data
-        terms_data = [{"term": t.term} for t in terms]
-        competitors_data = [{"extracted_data": c.extracted_data} for c in competitors]
-        guidelines_data = {
-            "word_count": {"min": guideline.word_count_min, "max": guideline.word_count_max}
-        } if guideline else None
+        # Check if AI is enabled
+        ai_enabled = get_config('ai.enabled', False)
         
-        from modules.ai.brief_generator import generate_brief
+        if not ai_enabled:
+            logger.warning("AI disabled, returning mock brief")
+            # Return mock brief when AI is disabled
+            return {
+                "title": f"SEO Brief for '{analysis.keyword}'",
+                "keyword": analysis.keyword,
+                "suggested_title": f"Complete Guide to {analysis.keyword.title()}",
+                "meta_description": f"Learn everything about {analysis.keyword} including best practices, tips, and expert advice.",
+                "h1": f"The Ultimate Guide to {analysis.keyword.title()}",
+                "sections": [
+                    f"What is {analysis.keyword}?",
+                    f"Why {analysis.keyword} Matters",
+                    f"How to Implement {analysis.keyword}",
+                    f"Best Practices for {analysis.keyword}",
+                    f"{analysis.keyword} Tips and Tricks",
+                    "Conclusion"
+                ],
+                "word_count_target": guideline.word_count_median if guideline else 1500,
+                "top_keywords": [t.term for t in terms[:10]] if terms else [],
+                "tone": request.tone,
+                "note": "This is a mock brief. Enable AI for full functionality."
+            }
         
-        brief = await generate_brief(
-            keyword=analysis.keyword,
-            language=analysis.language,
-            competitors_data=competitors_data,
-            terms_data=terms_data,
-            guidelines=guidelines_data
-        )
-        
-        return brief
+        # Try AI generation
+        try:
+            competitors = db.query(Competitor).filter(
+                Competitor.analysis_id == request.analysis_id,
+                Competitor.is_enabled == True
+            ).all()
+            
+            # Format data
+            terms_data = [{"term": t.term} for t in terms]
+            competitors_data = [{"extracted_data": c.extracted_data} for c in competitors]
+            guidelines_data = {
+                "word_count": {"min": guideline.word_count_min, "max": guideline.word_count_max}
+            } if guideline else None
+            
+            from modules.ai.brief_generator import generate_brief
+            
+            brief = await generate_brief(
+                keyword=analysis.keyword,
+                language=analysis.language,
+                competitors_data=competitors_data,
+                terms_data=terms_data,
+                guidelines=guidelines_data
+            )
+            
+            return brief
+            
+        except Exception as e:
+            logger.error(f"AI brief generation failed: {e}, returning mock")
+            # Fallback to mock if AI fails
+            return {
+                "title": f"SEO Brief for '{analysis.keyword}'",
+                "keyword": analysis.keyword,
+                "suggested_title": f"Complete Guide to {analysis.keyword.title()}",
+                "meta_description": f"Learn everything about {analysis.keyword}.",
+                "sections": [f"Introduction to {analysis.keyword}", "Main Content", "Conclusion"],
+                "word_count_target": guideline.word_count_median if guideline else 1500,
+                "top_keywords": [t.term for t in terms[:5]] if terms else [],
+                "tone": request.tone,
+                "error": str(e),
+                "note": "AI generation failed, using mock brief."
+            }
         
     except Exception as e:
         logger.error(f"Brief generation error: {str(e)}", exc_info=True)
