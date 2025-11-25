@@ -37,15 +37,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 z-index: 9999;
                 font-weight: 500;
             `;
-            toast.textContent = 'Analysis ID saved! Now you can use AI Writer features.';
+            toast.textContent = 'Redirecting to Editor...';
             document.body.appendChild(toast);
 
             setTimeout(() => toast.remove(), 3000);
 
-            // Redirect to main page where all features are available
-            // User can navigate to AI Writer or other features from there
+            // Redirect to Editor with analysis ID
             setTimeout(() => {
-                window.location.href = `index.html`;
+                window.location.href = `editor.html?id=${analysisId}`;
             }, 1000);
         });
 

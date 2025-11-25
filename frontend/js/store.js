@@ -3,9 +3,10 @@
 
 document.addEventListener('alpine:init', () => {
     Alpine.store('app', {
-        // --- State ---
+        // State
         currentAnalysisId: null,
-        currentKeyword: '',
+        keyword: '',
+        language: 'uk',
 
         // Content
         content: '',
@@ -14,62 +15,88 @@ document.addEventListener('alpine:init', () => {
 
         // Scoring
         score: 0,
-        scoreBreakdown: {
-            terms: { score: 0, max: 60 },
-            structure: { score: 0, max: 20 },
-            headings: { score: 0, max: 20 }
-        },
-
-        // Guidelines
-        terms: [], // Array of { term, count, min, max, status }
-        structure: {}, // { word_count: { current, min, max }, ... }
+        terms: [],
+        structure: {},
+        headings: {},
 
         // UI State
-        isLoading: false,
-        activeTab: 'write', // 'write' | 'review'
+        loading: {
+            analysis: false,
+            scoring: false,
+            ai: false
+        },
+        activeTab: 'write',
 
-        // --- Actions ---
+        // Error handling
+        error: {
+            message: '',
+            code: '',
+            visible: false
+        },
 
+        // Actions
         init() {
             console.log('🚀 AppState Initialized');
         },
 
-        setAnalysis(id, keyword) {
-            this.currentAnalysisId = id;
-            this.currentKeyword = keyword;
+        setAnalysis(data) {
+            this.currentAnalysisId = data.id;
+            this.keyword = data.keyword;
+            this.language = data.language;
         },
 
-        updateContent(newContent) {
-            this.content = newContent;
-            // Simple word count (can be improved)
-            const text = newContent.replace(/<[^>]*>/g, ' ');
-            this.wordCount = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+        updateContent(text) {
+            this.content = text;
+            this.wordCount = text.split(/\s+/).filter(w => w.length > 0).length;
             this.charCount = text.length;
         },
 
         updateScore(scoreData) {
-            this.score = scoreData.total_score;
-            this.scoreBreakdown = scoreData.breakdown;
-
-            // Update terms list
-            if (scoreData.term_details) {
-                this.terms = scoreData.term_details.map(t => ({
-                    term: t.term,
-                    count: t.current,
-                    min: t.recommended_min,
-                    max: t.recommended_max,
-                    status: t.status // 'low', 'good', 'high'
-                }));
-            }
-
-            // Update structure metrics
-            if (scoreData.structure_details) {
-                this.structure = scoreData.structure_details;
-            }
+            this.score = scoreData.total_score || 0;
+            this.terms = scoreData.term_details || [];
+            this.structure = scoreData.structure_details || {};
+            this.headings = scoreData.headings_details || {};
         },
 
-        setLoading(state) {
-            this.isLoading = state;
+        setLoading(key, value) {
+            this.loading[key] = value;
+        },
+
+        setTab(tab) {
+            this.activeTab = tab;
+        },
+
+        // Error handling methods
+        showError(message, code = 'ERROR') {
+            this.error = {
+                message,
+                code,
+                visible: true
+            };
+            // Auto-hide after 5 seconds
+            setTimeout(() => this.clearError(), 5000);
+        },
+
+        clearError() {
+            this.error = {
+                message: '',
+                code: '',
+                visible: false
+            };
+        },
+
+        // API error handler
+        handleApiError(error) {
+            if (error.error) {
+                // Standardized error from backend
+                this.showError(error.error, error.error_code || 'API_ERROR');
+            } else if (error.message) {
+                // JavaScript error
+                this.showError(error.message, 'CLIENT_ERROR');
+            } else {
+                // Unknown error
+                this.showError('An unexpected error occurred', 'UNKNOWN_ERROR');
+            }
         }
     });
 });

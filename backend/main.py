@@ -510,7 +510,7 @@ async def score_draft(analysis_id: str, request: ScoreDraftRequest):
         
         # Compute score
         score_result = compute_content_score(
-            request.text,
+            request.content,
             guidelines_data,
             terms_data,
             request.format
