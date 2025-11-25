@@ -65,6 +65,7 @@ class Analysis(Base):
     language = Column(String(10), nullable=False)
     location = Column(String(100), nullable=False)
     device = Column(String(20), nullable=False)  # desktop | mobile
+    scoring_version = Column(String(20), nullable=True, default="1.0.0")  # Track scoring algorithm version
     status = Column(SQLEnum(AnalysisStatus), default=AnalysisStatus.PENDING, nullable=False)
     error_message = Column(Text, nullable=True)
     

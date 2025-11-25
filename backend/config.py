@@ -51,6 +51,10 @@ DATABASE_URL = get_env_var('DATABASE_URL', required=True)
 USE_MOCK_SERP = get_env_var('USE_MOCK_SERP', default='false').lower() == 'true'
 SERP_PROVIDER = get_env_var('SERP_PROVIDER', default='serpapi')
 SERPAPI_KEY = get_env_var('SERPAPI_KEY', required=not USE_MOCK_SERP)
+SERP_CACHE_ENABLED = get_env_var('SERP_CACHE_ENABLED', default='true').lower() == 'true'
+
+# Scraping
+PLAYWRIGHT_HEADLESS = get_env_var('PLAYWRIGHT_HEADLESS', default='true').lower() == 'true'
 
 # AI Configuration
 AI_ENABLED = get_env_var('AI_ENABLED', default='false').lower() == 'true'

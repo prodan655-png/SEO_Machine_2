@@ -330,6 +330,9 @@ def compute_content_score(
     Returns:
         Complete score breakdown
     """
+    # Import here to avoid circular import
+    from modules.scoring_constants import SCORING_VERSION
+    
     # Parse draft
     draft_metrics = parse_draft_content(draft_text, format)
     
@@ -358,6 +361,7 @@ def compute_content_score(
     
     result = {
         'total_score': total_score,
+        'scoring_version': SCORING_VERSION,  # Track which version was used
         'breakdown': {
             'term_coverage': {
                 'score': term_coverage['score'],
@@ -377,7 +381,7 @@ def compute_content_score(
         'headings_details': headings
     }
     
-    logger.info(f"Content score: {total_score}/100 (terms={term_coverage['score']}, structure={structure['score']}, headings={headings['score']})")
+    logger.info(f"Content score: {total_score}/100 (v{SCORING_VERSION}, terms={term_coverage['score']}, structure={structure['score']}, headings={headings['score']})")
     
     return result
 

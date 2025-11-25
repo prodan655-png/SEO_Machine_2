@@ -118,14 +118,15 @@
 
                     <div class="editor-stats"
                         style="margin-top: 1rem; padding: 0.5rem; background: rgba(59, 130, 246, 0.1); border-radius: 4px;">
-                        <span>Words: <strong id="wordCount">0</strong></span>
-                        <span style="margin-left: 2rem;">Chars: <strong id="charCount">0</strong></span>
+                        <span>Words: <strong id="wordCount" x-data x-text="$store.app.wordCount">0</strong></span>
+                        <span style="margin-left: 2rem;">Chars: <strong id="charCount" x-data
+                                x-text="$store.app.charCount">0</strong></span>
                     </div>
                 </div>
             </main>
 
             <!-- RIGHT COLUMN: Guidelines Sidebar -->
-            <aside class="guidelines-sidebar">
+            <aside class="guidelines-sidebar" x-data>
                 <div class="guidelines-header">
                     <h3 class="guidelines-title">📋 Guidelines</h3>
                 </div>
@@ -137,10 +138,11 @@
                             <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(30, 41, 59, 0.6)"
                                 stroke-width="8" />
                             <circle id="score-circle-fill" cx="60" cy="60" r="54" fill="none" stroke="#3b82f6"
-                                stroke-width="8" stroke-dasharray="339" stroke-dashoffset="339" stroke-linecap="round"
+                                stroke-width="8" stroke-dasharray="339"
+                                :stroke-dashoffset="339 - (339 * $store.app.score / 100)" stroke-linecap="round"
                                 style="transition: stroke-dashoffset 1s ease;" />
                         </svg>
-                        <div class="score-value-small" id="score-value">0</div>
+                        <div class="score-value-small" x-text="$store.app.score">0</div>
                     </div>
                     <span class="score-label-small">CONTENT SCORE</span>
                 </div>
@@ -151,8 +153,27 @@
                         <span class="icon">🔑</span>
                         Important Terms
                     </h4>
-                    <ul class="terms-list" id="terms-list">
-                        <li style="color: var(--text-secondary); padding: 0.5rem;">Run analysis to see terms...</li>
+                    <ul class="terms-list">
+                        <template x-if="$store.app.terms.length === 0">
+                            <li style="color: var(--text-secondary); padding: 0.5rem;">Run analysis to see terms...</li>
+                        </template>
+
+                        <template x-for="term in $store.app.terms" :key="term.term">
+                            <li class="term-item" :class="{
+                                    'status-good': term.status === 'good',
+                                    'status-low': term.status === 'low',
+                                    'status-high': term.status === 'high'
+                                }">
+                                <span class="term-text" x-text="term.term"></span>
+                                <span class="term-count">
+                                    <span x-text="term.count"></span>/<span x-text="term.max"></span>
+                                </span>
+                                <div class="term-progress">
+                                    <div class="term-progress-bar"
+                                        :style="`width: ${Math.min((term.count / term.max) * 100, 100)}%`"></div>
+                                </div>
+                            </li>
+                        </template>
                     </ul>
                 </div>
 
@@ -162,8 +183,39 @@
                         <span class="icon">📊</span>
                         Content Structure
                     </h4>
-                    <ul class="metrics-list" id="metrics-list">
-                        <!-- Populated by JS -->
+                    <ul class="metrics-list">
+                        <!-- Word Count -->
+                        <li class="metric-item">
+                            <span class="metric-label">Words</span>
+                            <span class="metric-value">
+                                <span x-text="$store.app.wordCount"></span>
+                                <span class="metric-target" x-show="$store.app.structure.word_count">
+                                    / <span x-text="$store.app.structure.word_count?.recommended_min || '800+'"></span>
+                                </span>
+                            </span>
+                        </li>
+
+                        <!-- Headings -->
+                        <li class="metric-item">
+                            <span class="metric-label">Headings</span>
+                            <span class="metric-value">
+                                <span x-text="$store.app.structure.headings?.current || 0"></span>
+                                <span class="metric-target" x-show="$store.app.structure.headings">
+                                    / <span x-text="$store.app.structure.headings?.recommended_min || '3+'"></span>
+                                </span>
+                            </span>
+                        </li>
+
+                        <!-- Paragraphs -->
+                        <li class="metric-item">
+                            <span class="metric-label">Paragraphs</span>
+                            <span class="metric-value">
+                                <span x-text="$store.app.structure.paragraphs?.current || 0"></span>
+                                <span class="metric-target" x-show="$store.app.structure.paragraphs">
+                                    / <span x-text="$store.app.structure.paragraphs?.recommended_min || '5+'"></span>
+                                </span>
+                            </span>
+                        </li>
                     </ul>
                 </div>
             </aside>
@@ -174,6 +226,8 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <!-- Scripts -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="js/store.js"></script>
     <script src="js/api.js"></script>
     <script src="components/header.js"></script>
     <script src="diff-tracking.js"></script>

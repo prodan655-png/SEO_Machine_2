@@ -215,33 +215,6 @@ async def batch_extract_competitors(urls: List[str]) -> List[Dict[str, Any]]:
     results = []
     timeout = get_config('content_extraction.request_timeout', 30)
     
-    def extract_single(url: str) -> Dict[str, Any]:
-        """Extract content from single URL (synchronous)."""
-        try:
-            html = fetch_page_content(url, timeout)
-            return extract_main_content(html, url)
-        except ContentExtractionError as e:
-            logger.error(f"Failed to extract {url}: {str(e)}")
-            return {
-                'url': url,
-                'title': '',
-                'main_text': '',
-                'detected_language': None,
-                'headings': [],
-                'word_count': 0,
-                'paragraph_count': 0,
-                'image_count': 0,
-                'status': 'failed',
-                'error': str(e)
-            }
-        except Exception as e:
-            logger.error(f"Unexpected error for {url}: {str(e)}")
-            return {
-                'url': url,
-                'status': 'failed',
-                'error': f"Unexpected error: {str(e)}"
-            }
-    
     # Use ThreadPoolExecutor for parallel extraction
     with ThreadPoolExecutor(max_workers=5) as executor:
         futures = [executor.submit(extract_single, url) for url in urls]
@@ -251,6 +224,85 @@ async def batch_extract_competitors(urls: List[str]) -> List[Dict[str, Any]]:
     logger.info(f"Batch extraction complete: {valid_count}/{len(results)} valid")
     
     return results
+
+
+class PlaywrightExtractor:
+    """Extract content using Playwright for JS-heavy sites."""
+    
+    def __init__(self):
+        self.headless = get_config('scraping.playwright_headless', True)
+
+    def fetch_content(self, url: str, timeout: int = 30000) -> str:
+        """Fetch HTML content using Playwright."""
+        from playwright.sync_api import sync_playwright
+        
+        logger.info(f"Playwright: Fetching {url}")
+        try:
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=self.headless)
+                page = browser.new_page()
+                
+                # Block resources to speed up
+                page.route("**/*", lambda route: route.abort() 
+                    if route.request.resource_type in ["image", "media", "font"] 
+                    else route.continue_())
+                
+                page.goto(url, timeout=timeout, wait_until="domcontentloaded")
+                
+                # Wait for some content to load
+                try:
+                    page.wait_for_selector("p", timeout=5000)
+                except:
+                    pass
+                
+                content = page.content()
+                browser.close()
+                return content
+        except Exception as e:
+            logger.error(f"Playwright failed for {url}: {e}")
+            raise ContentExtractionError(f"Playwright error: {e}")
+
+
+def extract_single(url: str) -> Dict[str, Any]:
+    """Extract content from single URL with Playwright fallback."""
+    timeout = get_config('content_extraction.request_timeout', 30)
+    
+    # 1. Try Standard Request (BS4)
+    try:
+        html = fetch_page_content(url, timeout)
+        data = extract_main_content(html, url)
+        
+        # If valid, return immediately
+        if data['status'] == 'valid' and data['word_count'] >= 500:
+            return data
+            
+        logger.info(f"BS4 extraction weak ({data['word_count']} words) for {url}. Trying Playwright...")
+        
+    except Exception as e:
+        logger.warning(f"BS4 failed for {url}: {e}. Trying Playwright...")
+
+    # 2. Fallback to Playwright
+    try:
+        extractor = PlaywrightExtractor()
+        html = extractor.fetch_content(url)
+        data = extract_main_content(html, url)
+        data['extraction_method'] = 'playwright'
+        return data
+        
+    except Exception as e:
+        logger.error(f"All extraction methods failed for {url}: {e}")
+        return {
+            'url': url,
+            'title': '',
+            'main_text': '',
+            'detected_language': None,
+            'headings': [],
+            'word_count': 0,
+            'paragraph_count': 0,
+            'image_count': 0,
+            'status': 'failed',
+            'error': str(e)
+        }
 
 
 def _get_mock_content(url: str) -> str:

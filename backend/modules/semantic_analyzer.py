@@ -464,6 +464,59 @@ def analyze_competitors(
     return terms_with_ranges
 
 
+class SemanticAnalyzer:
+    """
+    Analyzer for semantic relevance using embeddings.
+    """
+    
+    def __init__(self):
+        self.model = None
+        self._load_model()
+        
+    def _load_model(self):
+        """Lazy load the model."""
+        try:
+            from sentence_transformers import SentenceTransformer
+            # Use a lightweight model
+            self.model = SentenceTransformer('all-MiniLM-L6-v2')
+            logger.info("Loaded sentence-transformer model: all-MiniLM-L6-v2")
+        except Exception as e:
+            logger.error(f"Failed to load sentence-transformers: {e}")
+            self.model = None
+
+    def calculate_similarity(self, text1: str, text2: str) -> float:
+        """
+        Calculate semantic similarity between two texts (0.0 to 1.0).
+        """
+        if not text1 or not text2:
+            return 0.0
+            
+        if not self.model:
+            logger.warning("Model not loaded, falling back to basic overlap")
+            return self._basic_overlap(text1, text2)
+            
+        try:
+            from sklearn.metrics.pairwise import cosine_similarity
+            
+            embeddings = self.model.encode([text1, text2])
+            similarity = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
+            return float(similarity)
+            
+        except Exception as e:
+            logger.error(f"Similarity calculation failed: {e}")
+            return self._basic_overlap(text1, text2)
+
+    def _basic_overlap(self, text1: str, text2: str) -> float:
+        """Fallback: Jaccard similarity of sets of words."""
+        set1 = set(text1.lower().split())
+        set2 = set(text2.lower().split())
+        if not set1 or not set2:
+            return 0.0
+        intersection = len(set1.intersection(set2))
+        union = len(set1.union(set2))
+        return intersection / union if union > 0 else 0.0
+
+
 if __name__ == "__main__":
     # Simple test
     test_docs = [
@@ -474,3 +527,7 @@ if __name__ == "__main__":
     
     tfidf = compute_tfidf_terms(test_docs, 'uk', {})
     print(f"TF-IDF terms: {tfidf[:5]}")
+    
+    analyzer = SemanticAnalyzer()
+    sim = analyzer.calculate_similarity(test_docs[0], test_docs[1])
+    print(f"Similarity: {sim}")

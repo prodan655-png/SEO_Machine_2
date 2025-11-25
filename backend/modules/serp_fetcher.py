@@ -50,13 +50,29 @@ def fetch_serp(
         from modules.mocks.serp_mock import mock_fetch_serp
         return mock_fetch_serp(keyword, language, location, device, count)
     
+    # Check Cache
+    from config import SERP_CACHE_ENABLED
+    if SERP_CACHE_ENABLED:
+        cache_key = _get_cache_key(keyword, language, location, device)
+        cached_data = _get_from_cache(cache_key)
+        if cached_data:
+            logger.info(f"SERP Cache Hit for '{keyword}'")
+            return cached_data
+
     # Real implementation
     from config import SERP_PROVIDER
     
+    result = None
     if SERP_PROVIDER == 'serper':
-        return _fetch_serper_dev(keyword, language, location, device, count)
+        result = _fetch_serper_dev(keyword, language, location, device, count)
     else:
-        return _fetch_serp_real(keyword, language, location, device, count)
+        result = _fetch_serp_real(keyword, language, location, device, count)
+        
+    # Save to cache
+    if SERP_CACHE_ENABLED and result and result.get('success'):
+        _save_to_cache(cache_key, result)
+        
+    return result
 
 
 def _fetch_serper_dev(
@@ -120,7 +136,6 @@ def _fetch_serper_dev(
                 
             # Avoid rate limits
             if len(all_results) < count:
-                import time
                 time.sleep(0.5)
                 
         except Exception as e:
@@ -245,91 +260,139 @@ def _fetch_serp_real(
         "api_key": SERPAPI_KEY
     }
     
-    # Retry logic
-    max_retries = get_config('serp.retry_attempts', 3)
-    retry_delay = get_config('serp.retry_delay', 2)
-    timeout = get_config('serp.request_timeout', 30)
+    # Retry logic using tenacity
+    from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
     
-    for attempt in range(max_retries):
-        try:
-            response = requests.get(
-                "https://serpapi.com/search",
-                params=params,
-                timeout=timeout
-            )
-            response.raise_for_status()
-            data = response.json()
-            
-            # Extract organic results
-            organic_results = data.get("organic_results", [])
-            
-            if not organic_results:
-                raise NoSerpResultsError(f"No SERP results for keyword '{keyword}'")
-            
-            # Format results
-            results = []
-            domains_seen = set()
-            
-            for idx, result in enumerate(organic_results[:count]):
-                url = result.get("link")
-                domain = _extract_domain(url)
-                
-                # Track unique domains
-                domains_seen.add(domain)
-                
-                results.append({
-                    "position": idx + 1,
-                    "url": url,
-                    "title": result.get("title", ""),
-                    "snippet": result.get("snippet", ""),
-                    "domain": domain
-                })
-            
-            # Check for single domain dominance
-            if len(domains_seen) == 1 and len(results) > 5:
-                logger.warning(f"Single domain dominance detected: {list(domains_seen)[0]}")
-            
-            logger.info(f"[OK] Fetched {len(results)} SERP results ({len(domains_seen)} unique domains)")
-            
-            return {
-                "success": True,
-                "results": results,
-                "metadata": {
-                    "total_results": len(results),
-                    "unique_domains": len(domains_seen),
-                    "query_time": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "mock": False,
-                    "provider": "serpapi"
-                }
-            }
-            
-        except requests.exceptions.Timeout:
-            logger.warning(f"SERP API timeout (attempt {attempt + 1}/{max_retries})")
-            if attempt < max_retries - 1:
-                time.sleep(retry_delay)
-            else:
-                raise SerpAPIError("SERP API request timed out after retries")
+    max_retries = get_config('serp.retry_attempts', 3)
+    
+    @retry(
+        stop=stop_after_attempt(max_retries),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type(requests.exceptions.RequestException),
+        reraise=True
+    )
+    def make_request():
+        response = requests.get(
+            "https://serpapi.com/search",
+            params=params,
+            timeout=get_config('serp.request_timeout', 30)
+        )
+        response.raise_for_status()
+        return response.json()
+
+    try:
+        data = make_request()
         
-        except requests.exceptions.RequestException as e:
-            logger.error(f"SERP API request failed: {str(e)}")
-            if "401" in str(e) or "403" in str(e):
-                logger.warning("Invalid API key or unauthorized. Falling back to MOCK SERP.")
-                from modules.mocks.serp_mock import mock_fetch_serp
-                return mock_fetch_serp(keyword, language, location, device, count)
+        # Extract organic results
+        organic_results = data.get("organic_results", [])
+        
+        if not organic_results:
+            raise NoSerpResultsError(f"No SERP results for keyword '{keyword}'")
+        
+        # Format results
+        results = []
+        domains_seen = set()
+        
+        for idx, result in enumerate(organic_results[:count]):
+            url = result.get("link")
+            domain = _extract_domain(url)
             
-            if attempt < max_retries - 1:
-                time.sleep(retry_delay)
-            else:
-                logger.error("All retries failed. Falling back to MOCK SERP.")
-                from modules.mocks.serp_mock import mock_fetch_serp
-                return mock_fetch_serp(keyword, language, location, device, count)
+            # Track unique domains
+            domains_seen.add(domain)
+            
+            results.append({
+                "position": idx + 1,
+                "url": url,
+                "title": result.get("title", ""),
+                "snippet": result.get("snippet", ""),
+                "domain": domain
+            })
+        
+        logger.info(f"[OK] Fetched {len(results)} SERP results ({len(domains_seen)} unique domains)")
+        
+        return {
+            "success": True,
+            "results": results,
+            "metadata": {
+                "total_results": len(results),
+                "unique_domains": len(domains_seen),
+                "query_time": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "mock": False,
+                "provider": "serpapi"
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"SERP API request failed after retries: {str(e)}")
+        if "401" in str(e) or "403" in str(e):
+            logger.warning("Invalid API key or unauthorized. Falling back to MOCK SERP.")
+            from modules.mocks.serp_mock import mock_fetch_serp
+            return mock_fetch_serp(keyword, language, location, device, count)
+        raise SerpAPIError(f"SERP failed: {e}")
 
 
 def _extract_domain(url: str) -> str:
     """Extract domain from URL."""
     from urllib.parse import urlparse
-    parsed = urlparse(url)
-    return parsed.netloc.replace("www.", "")
+    try:
+        parsed = urlparse(url)
+        return parsed.netloc.replace("www.", "")
+    except:
+        return ""
+
+
+# --- Caching Implementation ---
+import sqlite3
+import json
+import hashlib
+from pathlib import Path
+
+CACHE_DB_PATH = Path(__file__).parent.parent / 'serp_cache.db'
+
+def _init_cache():
+    """Initialize cache database."""
+    with sqlite3.connect(CACHE_DB_PATH) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS serp_cache (
+                key TEXT PRIMARY KEY,
+                data TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+def _get_cache_key(keyword, language, location, device):
+    """Generate unique cache key."""
+    raw = f"{keyword}|{language}|{location}|{device}"
+    return hashlib.md5(raw.encode()).hexdigest()
+
+def _get_from_cache(key):
+    """Retrieve from cache."""
+    try:
+        with sqlite3.connect(CACHE_DB_PATH) as conn:
+            cursor = conn.execute("SELECT data FROM serp_cache WHERE key = ?", (key,))
+            row = cursor.fetchone()
+            if row:
+                return json.loads(row[0])
+    except Exception as e:
+        logger.warning(f"Cache read error: {e}")
+    return None
+
+def _save_to_cache(key, data):
+    """Save to cache."""
+    try:
+        with sqlite3.connect(CACHE_DB_PATH) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO serp_cache (key, data) VALUES (?, ?)",
+                (key, json.dumps(data))
+            )
+    except Exception as e:
+        logger.warning(f"Cache write error: {e}")
+
+# Initialize cache on module load
+try:
+    _init_cache()
+except Exception as e:
+    logger.error(f"Failed to init SERP cache: {e}")
 
 
 if __name__ == "__main__":
@@ -337,5 +400,4 @@ if __name__ == "__main__":
     result = fetch_serp("keto diet", "en", "United States", "desktop", 10)
     print(f"Success: {result['success']}")
     print(f"Results: {len(result['results'])}")
-    for r in result['results'][:3]:
-        print(f"  {r['position']}. {r['title']} ({r['domain']})")
+

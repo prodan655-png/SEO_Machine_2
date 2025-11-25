@@ -1,24 +1,22 @@
 // Editor Logic
+// Refactored to use Alpine.js Store
+
 document.addEventListener('DOMContentLoaded', async () => {
     // 1. Get URL Params
     const urlParams = new URLSearchParams(window.location.search);
     const analysisId = urlParams.get('id');
     const keyword = urlParams.get('keyword');
 
-    // 2. State
-    let currentScoreData = null;
-    let isPreviewMode = false;
+    // 2. Initialize Store
+    const store = Alpine.store('app');
+    if (analysisId && keyword) {
+        store.setAnalysis(analysisId, keyword);
+    }
 
-    // 3. UI Elements
+    // 3. UI Elements (Only those not handled by Alpine)
     const els = {
         editor: document.getElementById('draftContent'),
         preview: document.getElementById('previewContainer'),
-        wordCount: document.getElementById('wordCount'),
-        charCount: document.getElementById('charCount'),
-        scoreValue: document.getElementById('score-value'),
-        scoreCircle: document.getElementById('score-circle-fill'),
-        termsList: document.getElementById('terms-list'),
-        metricsList: document.getElementById('metrics-list'),
         keywordDisplay: document.getElementById('current-keyword'),
         btnHtml: document.getElementById('mode-html'),
         btnPreview: document.getElementById('mode-preview')
@@ -30,10 +28,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (analysisId) {
-        // Load initial data if needed (optional, maybe get previous draft)
         console.log('Loaded editor for analysis:', analysisId);
     } else {
-        // Demo mode or error
         if (!keyword) showToast('⚠️ No analysis selected. Features may be limited.', 'warning');
     }
 
@@ -41,14 +37,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Editor Input (Debounced Scoring)
     els.editor.addEventListener('input', debounce(async (e) => {
-        updateStats(e.target.value);
+        // Update Store Content & Stats
+        store.updateContent(e.target.value);
+
         if (analysisId) {
             await performScoring(e.target.value);
         }
     }, 1000)); // Debounce 1s for scoring
 
     // Immediate stats update
-    els.editor.addEventListener('input', (e) => updateStats(e.target.value));
+    els.editor.addEventListener('input', (e) => {
+        store.updateContent(e.target.value);
+    });
 
     // View Modes
     els.btnHtml.addEventListener('click', () => switchMode('html'));
@@ -71,18 +71,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const brief = await window.API.generateBrief(analysisId, 'professional');
             console.log('Brief generated:', brief);
-
-            // Display brief in modal
             showBriefModal(brief);
             showToast('✅ Brief generated!', 'success');
 
         } catch (error) {
             console.error('Brief generation error:', error);
-            if (error.message.includes('AI features') || error.message.includes('503')) {
-                showToast('❌ AI features disabled. Check backend config.', 'error');
-            } else {
-                showToast(`❌ ${error.message}`, 'error');
-            }
+            showToast(`❌ ${error.message}`, 'error');
         }
     });
 
@@ -92,8 +86,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('btn-seo-coach')?.addEventListener('click', async () => {
         showToast('🎓 Calling SEO Coach...', 'info');
-        // Mock integration for now - in real app would call API
-        // This triggers the diff modal from diff-tracking.js
         if (window.showDiffModal) {
             // Demo diff
             const oldContent = els.editor.value;
@@ -112,8 +104,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const result = await window.API.generateImages(analysisId, els.editor.value);
             if (result.updated_html) {
                 els.editor.value = result.updated_html;
+                store.updateContent(result.updated_html); // Update Store
                 showToast('✅ Images inserted!', 'success');
-                updateStats(els.editor.value);
             }
         } catch (e) {
             showToast('❌ Generation failed', 'error');
@@ -133,23 +125,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 6. Functions
 
-    function updateStats(text) {
-        const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
-        els.wordCount.textContent = words;
-        els.charCount.textContent = text.length;
-    }
-
     async function performScoring(content) {
         if (!content.trim()) return;
 
         try {
             const scoreData = await window.API.scoreContent(analysisId, content);
-            updateScoreUI(scoreData);
+            // Update Store with Score Data
+            store.updateScore(scoreData);
         } catch (e) {
             console.error('Scoring error:', e);
             // Fallback for demo/offline
-            updateScoreUI({
+            store.updateScore({
                 total_score: Math.floor(Math.random() * 30) + 50,
+                breakdown: { terms: { score: 10, max: 60 }, structure: { score: 10, max: 20 }, headings: { score: 10, max: 20 } },
                 term_details: [
                     { term: keyword || 'seo', current: 2, recommended_min: 5, recommended_max: 10, status: 'low' }
                 ],
@@ -160,59 +148,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    function updateScoreUI(data) {
-        currentScoreData = data;
-
-        // Score Circle
-        els.scoreValue.textContent = data.total_score;
-        const offset = 339 - (data.total_score / 100) * 339;
-        els.scoreCircle.style.strokeDashoffset = offset;
-
-        // Color
-        let color = '#ef4444';
-        if (data.total_score >= 60) color = '#f59e0b';
-        if (data.total_score >= 80) color = '#10b981';
-        els.scoreCircle.style.stroke = color;
-
-        // Terms
-        if (data.term_details) {
-            els.termsList.innerHTML = data.term_details.slice(0, 10).map(t => `
-                <li class="term-item ${t.status || 'medium'}">
-                    <span class="term-name">${t.term}</span>
-                    <span class="term-count">${t.current}/${t.recommended_min}-${t.recommended_max}</span>
-                </li>
-            `).join('');
-        }
-
-        // Metrics
-        if (data.structure_details) {
-            const wc = data.structure_details.word_count;
-            if (wc) {
-                els.metricsList.innerHTML = `
-                    <li class="metric-item">
-                        <span class="metric-label">Words</span>
-                        <div>
-                            <span class="metric-value ${getMetricStatus(wc.current, wc.recommended_min, wc.recommended_max)}">
-                                ${wc.current}/${wc.recommended_min}
-                            </span>
-                            <div class="metric-bar">
-                                <div class="metric-bar-fill" style="width: ${Math.min((wc.current / wc.recommended_max) * 100, 100)}%"></div>
-                            </div>
-                        </div>
-                    </li>
-                `;
-            }
-        }
-    }
-
-    function getMetricStatus(val, min, max) {
-        if (val >= min && val <= max) return 'good';
-        if (val >= min * 0.8) return 'medium';
-        return 'low';
-    }
-
     function switchMode(mode) {
-        isPreviewMode = mode === 'preview';
+        let isPreviewMode = mode === 'preview';
         if (isPreviewMode) {
             els.btnHtml.classList.remove('active');
             els.btnPreview.classList.add('active');
@@ -295,7 +232,7 @@ ${JSON.stringify(brief, null, 2)}
                 const result = await window.API.generateArticle(brief, 'professional', 'uk');
                 if (result.article) {
                     els.editor.value = result.article;
-                    updateStats(result.article);
+                    store.updateContent(result.article); // Update Store
                     showToast('✅ Article generated!', 'success');
                     if (analysisId) await performScoring(result.article);
                 }

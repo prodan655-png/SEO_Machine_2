@@ -28,6 +28,7 @@ from modules.content_extractor import batch_extract_competitors
 from modules.semantic_analyzer import analyze_competitors
 from modules.guidelines_generator import generate_guidelines
 from modules.content_scorer import compute_content_score
+from modules.analysis_cache import get_cached_analysis, save_analysis_to_cache
 
 # Setup
 logger = setup_logger('api', log_file=get_config('logging.file', 'logs/seo_analyzer.log'))
@@ -237,6 +238,26 @@ async def process_analysis_task(analysis_id: str):
         db.commit()
         logger.info(f"Analysis {analysis_id} completed successfully")
         
+        # Save to cache for future requests
+        try:
+            cache_data = {
+                "analysis_id": analysis_id,
+                "keyword": analysis.keyword,
+                "language": analysis.language,
+                "location": analysis.location,
+                "competitors_count": len([c for c in extracted_data if c.get('status') == 'valid']),
+                "terms_count": len(terms_data),
+                "cached_at": datetime.utcnow().isoformat()
+            }
+            save_analysis_to_cache(
+                analysis.keyword,
+                analysis.language,
+                analysis.location,
+                cache_data
+            )
+        except Exception as cache_error:
+            logger.warning(f"Failed to save to cache: {cache_error}")
+        
     except Exception as e:
         logger.error(f"Error processing analysis {analysis_id}: {str(e)}", exc_info=True)
         analysis.status = AnalysisStatus.FAILED
@@ -261,6 +282,22 @@ async def create_analysis(
     db: Session = SessionLocal()
     
     try:
+        # Check cache first
+        cached = get_cached_analysis(request.keyword, request.language, request.location)
+        
+        if cached:
+            logger.info(f"✅ Analysis cache HIT for '{request.keyword}' - returning instantly")
+            # Return cached analysis ID immediately without DB check
+            return AnalysisCreateResponse(
+                id=cached.get('analysis_id'),
+                keyword=request.keyword,
+                language=request.language,
+                location=request.location,
+                device=request.device,
+                status='completed',
+                created_at=cached.get('cached_at', datetime.utcnow().isoformat())
+            )
+        
         # Create analysis record
         import uuid
         analysis = Analysis(
