@@ -216,7 +216,7 @@ async def batch_extract_competitors(urls: List[str]) -> List[Dict[str, Any]]:
     timeout = get_config('content_extraction.request_timeout', 30)
     
     # Use ThreadPoolExecutor for parallel extraction
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=10) as executor:
         futures = [executor.submit(extract_single, url) for url in urls]
         results = [future.result() for future in futures]
     

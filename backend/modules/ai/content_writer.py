@@ -44,7 +44,7 @@ class ContentWriter:
             response = await self.ai_client.generate_content(
                 prompt, 
                 temperature=0.7,
-                max_tokens=4000  # Increase token limit for full text
+                max_tokens=8000  # Increase token limit for full text
             )
             
             logger.info("Generated article content")

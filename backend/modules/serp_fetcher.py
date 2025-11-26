@@ -61,7 +61,12 @@ def fetch_serp(
 
     # Real implementation
     from config import SERP_PROVIDER
+    logger.info(f"DEBUG: fetch_serp called. Provider={SERP_PROVIDER}, Key={SERPAPI_KEY[:5]}...")
     
+    # DEBUG LOGGING
+    with open("debug_serp.log", "a", encoding="utf-8") as f:
+        f.write(f"\n=== NEW REQUEST ===\nKeyword: {keyword}\nProvider: {SERP_PROVIDER}\n")
+
     result = None
     if SERP_PROVIDER == 'serper':
         result = _fetch_serper_dev(keyword, language, location, device, count)
@@ -119,7 +124,15 @@ def _fetch_serper_dev(
         logger.info(f"Fetching SERP page start={start}, num={num_to_fetch}")
         
         try:
+            # DEBUG LOGGING
+            with open("debug_serp.log", "a", encoding="utf-8") as f:
+                f.write(f"\n--- Request ---\nURL: {url}\nHeaders: {headers}\nPayload: {payload}\n")
+
             response = requests.request("POST", url, headers=headers, data=payload)
+            
+            with open("debug_serp.log", "a", encoding="utf-8") as f:
+                f.write(f"--- Response ---\nStatus: {response.status_code}\nBody: {response.text[:1000]}\n")
+
             response.raise_for_status()
             data = response.json()
             
@@ -198,7 +211,17 @@ def _fetch_serper_dev(
         logger.warning(f"Aggressive filtering! Original: {len(organic_results)}, Filtered: {len(filtered_results)}")
     
     if not filtered_results:
-        raise NoSerpResultsError(f"No SERP results for keyword '{keyword}'")
+        if organic_results:
+            # We found results but filtered them all out
+            blocked_count = len(organic_results)
+            raise NoSerpResultsError(
+                f"Found {blocked_count} results for '{keyword}', but ALL were blocked "
+                f"(Russian sites, social media, or irrelevant domains). "
+                f"Try changing the 'Location' or 'Language' settings."
+            )
+        else:
+            # We truly found nothing
+            raise NoSerpResultsError(f"No SERP results found for keyword '{keyword}' via API")
         
     results = []
     domains_seen = set()
@@ -272,11 +295,19 @@ def _fetch_serp_real(
         reraise=True
     )
     def make_request():
+        # DEBUG LOGGING
+        with open("debug_serp.log", "a", encoding="utf-8") as f:
+            f.write(f"--- SerpAPI Request ---\nParams: {params}\n")
+
         response = requests.get(
             "https://serpapi.com/search",
             params=params,
             timeout=get_config('serp.request_timeout', 30)
         )
+        
+        with open("debug_serp.log", "a", encoding="utf-8") as f:
+            f.write(f"--- SerpAPI Response ---\nStatus: {response.status_code}\nBody: {response.text[:1000]}\n")
+
         response.raise_for_status()
         return response.json()
 
@@ -287,7 +318,10 @@ def _fetch_serp_real(
         organic_results = data.get("organic_results", [])
         
         if not organic_results:
-            raise NoSerpResultsError(f"No SERP results for keyword '{keyword}'")
+            raise NoSerpResultsError(
+                f"No SERP results for keyword '{keyword}' via SerpAPI. "
+                f"Check your Location/Language settings or API key quotas."
+            )
         
         # Format results
         results = []

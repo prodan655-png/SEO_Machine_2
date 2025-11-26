@@ -5,7 +5,7 @@ Provides REST API endpoints for SEO content analysis.
 
 import os
 import sys
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 import asyncio
 from contextlib import asynccontextmanager
@@ -20,7 +20,7 @@ from sqlalchemy.orm import sessionmaker, Session
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import DATABASE_URL, ALLOWED_ORIGINS, get_config
-from database import Base, SessionLocal, Analysis, Competitor, Term, Guideline, Draft, AnalysisStatus, get_db
+from database import Base, SessionLocal, Analysis, Competitor, Term, Guideline, Draft, AnalysisStatus, Project, get_db
 from logger import setup_logger
 from models import CompetitorToggleRequest
 from modules.serp_fetcher import fetch_serp
@@ -71,6 +71,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include routers
+from routers.projects import router as projects_router
+app.include_router(projects_router)
+
 
 # Pydantic models
 class AnalysisCreateRequest(BaseModel):
@@ -99,13 +103,13 @@ class ScoreDraftRequest(BaseModel):
     content: str = Field(..., min_length=1)
     format: str = Field(default="html", pattern="^(html|markdown)$")
 
-
 # Background task function
 async def process_analysis_task(analysis_id: str):
     """
     Background task to process SEO analysis.
     Fetches SERP, extracts content, analyzes competitors, generates guidelines.
     """
+    logger.info(f"DEBUG: process_analysis_task STARTED for {analysis_id}")
     db: Session = SessionLocal()
     
     try:
@@ -115,16 +119,29 @@ async def process_analysis_task(analysis_id: str):
             logger.error(f"Analysis {analysis_id} not found")
             return
         
+        # Fetch Project context if linked
+        project_context = None
+        if analysis.project_id:
+            project = db.query(Project).filter(Project.id == analysis.project_id).first()
+            if project:
+                project_context = {
+                    "name": project.name,
+                    "description": project.description,
+                    "target_audience": project.target_audience,
+                    "tone_of_voice": project.tone_of_voice
+                }
+                logger.info(f"Using Project context: '{project.name}'")
+        
         logger.info(f"Processing analysis {analysis_id} for keyword '{analysis.keyword}'")
         
         # Step 1: Fetch SERP results
-        logger.info(f"Fetching SERP for '{analysis.keyword}' with count=50")
+        logger.info(f"Fetching SERP for '{analysis.keyword}' with count=10")
         serp_data = fetch_serp(
             analysis.keyword, 
             analysis.language, 
             analysis.location, 
             analysis.device,
-            count=50
+            count=10
         )
         logger.info(f"Got {len(serp_data.get('results', []))} results from SERP")
         
@@ -138,6 +155,15 @@ async def process_analysis_task(analysis_id: str):
         # Step 2: Extract competitor content in batch
         competitor_urls = [result['url'] for result in serp_data['results']]
         extracted_data = await batch_extract_competitors(competitor_urls)
+        
+        # Create URL -> SERP metadata mapping
+        serp_metadata_map = {}
+        for result in serp_data['results']:
+            serp_metadata_map[result['url']] = {
+                'snippet': result.get('snippet', ''),
+                'favicon': result.get('favicon', ''),
+                'thumbnail': result.get('thumbnail', '')
+            }
         
         # Filter valid competitors
         valid_competitors = [c for c in extracted_data if c['status'] == 'valid']
@@ -157,11 +183,17 @@ async def process_analysis_task(analysis_id: str):
 
         # Step 3: Save competitors to database
         for i, comp_data in enumerate(extracted_data):
+            # Get SERP metadata for this URL
+            serp_meta = serp_metadata_map.get(comp_data['url'], {})
+            
             competitor = Competitor(
                 analysis_id=analysis_id,
                 url=comp_data['url'],
                 position=i + 1,
                 title=comp_data.get('title', ''),
+                snippet=serp_meta.get('snippet'),  # From SERP
+                favicon_url=serp_meta.get('favicon'),  # From SERP
+                thumbnail_url=serp_meta.get('thumbnail'),  # From SERP
                 word_count=comp_data.get('word_count', 0),
                 status=comp_data.get('status', 'FAILED'),
                 extracted_data={
@@ -280,6 +312,7 @@ async def create_analysis(
     Triggers background task to fetch SERP and analyze competitors.
     """
     db: Session = SessionLocal()
+    logger.info(f"DEBUG: create_analysis called for keyword='{request.keyword}', lang='{request.language}', loc='{request.location}'")
     
     try:
         # Check cache first
@@ -302,6 +335,7 @@ async def create_analysis(
         import uuid
         analysis = Analysis(
             id=str(uuid.uuid4()),
+            project_id=request.project_id,  # Link to project
             keyword=request.keyword,
             language=request.language,
             location=request.location,
@@ -375,7 +409,129 @@ async def get_analysis(analysis_id: str):
         
         # Only include details if completed
         if analysis.status == AnalysisStatus.COMPLETED:
+            # Build serp_results from competitors (with real SERP metadata)
+            from urllib.parse import urlparse
+            serp_results = []
+            for c in analysis.competitors[:10]:  # Top 10
+                # Use stored SERP metadata if available, fallback to generated favicon
+                if not c.favicon_url:
+                    parsed_url = urlparse(c.url)
+                    domain = parsed_url.netloc or parsed_url.path.split('/')[0]
+                    c.favicon_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=64"
+                
+                serp_results.append({
+                    "position": c.position,
+                    "title": c.title or "Без назви",
+                    "url": c.url,
+                    "snippet": c.snippet or "",
+                    "favicon_url": c.favicon_url,
+                    "image_url": c.thumbnail_url  # This is the preview image
+                })
+            # First, extract H2/H3 from competitors (needed for both topics and structure)
+            all_h2 = []
+            all_h3 = []
+            for c in analysis.competitors:
+                if c.extracted_data and isinstance(c.extracted_data, dict):
+                    headings = c.extracted_data.get('headings', [])
+                    for h in headings:
+                        if isinstance(h, dict):
+                            if h.get('level') == 'h2':
+                                all_h2.append(h.get('text', '').strip())
+                            elif h.get('level') == 'h3':
+                                all_h3.append(h.get('text', '').strip())
+            
+            # Extract topics from competitor titles/headings
+            from collections import Counter
+            import re
+            # Combine titles and headings
+            topics_text = " ".join([c.title or "" for c in analysis.competitors if c.title])
+            for heading in all_h2:
+                topics_text += " " + heading
+            
+            # Simple word extraction (українською та англійською)
+            words = re.findall(r'\b[а-яіїєґА-ЯІЇЄҐ\'a-zA-Z]{4,}\b', topics_text.lower())
+            stopwords = {'тест', 'запитань', 'день', 'який', 'яка', 'тому', 'знайти', 'дізнайся', 'питань', 'вступ', 'висновки'}
+            filtered_words = [w for w in words if w not in stopwords]
+            topic_counts = Counter(filtered_words)
+            
+            # Return as array of objects with name and count
+            important_topics = [
+                {"name": word, "count": count}
+                for word, count in topic_counts.most_common(10)
+            ]
+            
+            # Build structure from competitor headings
+            h2_freq = Counter(all_h2)
+            # Get headings that appear in at least 2 competitors
+            common_h2 = [h for h, count in h2_freq.most_common(15) if count >= 2 and h]
+            
+            # Build sections
+            sections = [{"type": "intro", "title": "Вступ", "recommended": True}]
+            for heading in common_h2[:10]:  # Max 10 main sections
+                sections.append({
+                    "type": "section",
+                    "title": heading,
+                    "recommended": True,
+                    "source": "competitors"
+                })
+            sections.append({"type": "conclusion", "title": "Висновки", "recommended": True})
+            
+            structure = {
+                "sections": sections,
+                "min_sections": max(3, len(common_h2)),
+                "recommended_sections": len(sections),
+                "based_on_competitors": len([c for c in analysis.competitors if c.status.value == 'valid'])
+            }
+            
+            # Build coach (simple version, safe for edge cases)
+            priority_actions = []
+            
+            # Action 1: Keyword usage
+            if analysis.terms:
+                first_term = analysis.terms[0]
+                priority_actions.append({
+                    "action": f"Додайте ключове слово '{first_term.term}' {first_term.min_recommended}-{first_term.max_recommended} разів",
+                    "details": "Оптимальна частота для кращого ранжування",
+                    "score_gain": "+10-15"
+                })
+            else:
+                priority_actions.append({
+                    "action": f"Додайте ключове слово '{analysis.keyword}' у заголовок та перші абзаци",
+                    "details": "Базова рекомендація для SEO",
+                    "score_gain": "+5-10"
+                })
+            
+            # Action 2: Word count
+            if analysis.guideline:
+                priority_actions.append({
+                    "action": f"Напишіть {analysis.guideline.word_count_min}-{analysis.guideline.word_count_max} слів",
+                    "details": "Відповідає довжині конкурентів",
+                    "score_gain": "+5-10"
+                })
+            else:
+                priority_actions.append({
+                    "action": "Напишіть достатньо детальний текст (мінімум 300 слів)",
+                    "details": "Загальна рекомендація для SEO",
+                    "score_gain": "+5-10"
+                })
+            
+            # Action 3: Headings
+            priority_actions.append({
+                "action": "Додайте структуровані заголовки (H2, H3)",
+                "details": "Покращує читабельність та SEO",
+                "score_gain": "+5-8"
+            })
+            
+            coach = {
+                "status": "ok",
+                "priority_actions": priority_actions
+            }
+            
             response.update({
+                "serp_results": serp_results,
+                "important_topics": important_topics,
+                "structure": structure,
+                "coach": coach,
                 "competitors": [
                     {
                         "url": c.url,
@@ -739,6 +895,17 @@ async def generate_content_brief(request: BriefRequest):
                 "word_count": {"min": guideline.word_count_min, "max": guideline.word_count_max}
             } if guideline else None
             
+            # Fetch Project context if linked
+            project_context = None
+            if analysis.project_id:
+                project = db.query(Project).filter(Project.id == analysis.project_id).first()
+                if project:
+                    project_context = {
+                        "description": project.description,
+                        "target_audience": project.target_audience,
+                        "tone_of_voice": project.tone_of_voice
+                    }
+            
             from modules.ai.brief_generator import generate_brief
             
             brief = await generate_brief(
@@ -746,7 +913,8 @@ async def generate_content_brief(request: BriefRequest):
                 language=analysis.language,
                 competitors_data=competitors_data,
                 terms_data=terms_data,
-                guidelines=guidelines_data
+                guidelines=guidelines_data,
+                project_context=project_context
             )
             
             return brief
@@ -832,6 +1000,41 @@ async def parse_sitemap_url(request: SitemapRequest):
         return {"urls": urls, "count": len(urls)}
     except Exception as e:
         logger.error(f"Sitemap parsing error: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class CoachRequest(BaseModel):
+    current_score: float
+    target_score: Optional[float] = 90
+    breakdown: Dict[str, Any] = {}
+    term_details: List[Dict[str, Any]] = []
+    structure_details: Dict[str, Any] = {}
+    headings_details: Dict[str, Any] = {}
+
+
+@app.post("/api/ai/coach")
+async def get_seo_coaching_endpoint(payload: CoachRequest):
+    """
+    Get personalized SEO coaching based on content score.
+    """
+    if not get_config('ai.enabled', False):
+        raise HTTPException(status_code=503, detail="AI features disabled")
+    
+    try:
+        from modules.ai.coach import get_seo_coaching
+        coaching = await get_seo_coaching(
+            payload.current_score,
+            payload.target_score,
+            payload.breakdown,
+            payload.term_details,
+            payload.structure_details,
+            payload.headings_details
+        )
+        
+        return coaching
+        
+    except Exception as e:
+        logger.error(f"Coaching error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

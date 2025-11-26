@@ -110,25 +110,36 @@ def calculate_term_coverage_score(
         # Find positions
         positions = [m.start() for m in pattern.finditer(draft_text)]
         
-        # Calculate term score
-        if current_count >= min_rec and current_count <= max_rec:
-            # Perfect - full points for this term
-            term_score = 1.0
-            status = "ok"
-        elif current_count < min_rec:
-            # Under-optimized - proportional score
-            term_score = current_count / min_rec if min_rec > 0 else 0
-            status = "low"
-        elif current_count > max_rec * over_optimization_multiplier:
-            # Over-optimized - penalty
+        # Calculate term score with smooth decay
+        if current_count == 0:
             term_score = 0.0
-            status = "high"
+            status = "missing"
+        elif current_count < min_rec:
+            # Under-optimized: Linear growth
+            term_score = current_count / min_rec
+            status = "low"
+        elif current_count <= max_rec:
+            # Optimal
+            term_score = 1.0
+            status = "good"
         else:
-            # Slightly over - reduced score
-            over_amount = current_count - max_rec
-            penalty = over_amount / max_rec
-            term_score = max(0.5, 1.0 - penalty)
-            status = "high"
+            # Over-optimized: Smooth decay
+            # Threshold for heavy over-optimization (1.5x max)
+            heavy_threshold = max_rec * 1.5
+            
+            if current_count <= heavy_threshold:
+                # Slightly over: Linear decay from 1.0 to 0.5
+                # Formula: 1.0 - 0.5 * (over_amount / range)
+                over_amount = current_count - max_rec
+                range_val = heavy_threshold - max_rec
+                penalty = 0.5 * (over_amount / range_val) if range_val > 0 else 0.5
+                term_score = max(0.5, 1.0 - penalty)
+                status = "high"
+            else:
+                # Heavily over: Hyperbolic decay from 0.5 towards 0
+                # Formula: 0.5 * (threshold / current)
+                term_score = 0.5 * (heavy_threshold / current_count)
+                status = "high"
         
         total_term_score += term_score
         
@@ -179,40 +190,49 @@ def calculate_structure_score(
     
     # Word count sub-score
     wc = draft_metrics['word_count']
-    wc_min = guidelines['word_count']['min']
+    print(f"DEBUG: calculate_structure_score wc={wc}")
+    
+    if wc == 0:
+        return {
+            'score': 0,
+            'max': max_score,
+            'word_count': {'current': 0, 'recommended': "0-0", 'score': 0},
+            'images': {'current': 0, 'recommended': "0-0", 'score': 0},
+            'paragraphs': {'current': 0, 'score': 0}
+        }
+
     wc_min = guidelines['word_count']['min']
     wc_max = guidelines['word_count'].get('max', guidelines['word_count'].get('optimal', wc_min * 1.5))
     
-    if wc >= wc_min and wc <= wc_max:
-        wc_score = word_count_weight
-    elif wc < wc_min:
-        # Linear decrease
+    if wc < wc_min:
+        # Linear growth
         wc_score = (wc / wc_min) * word_count_weight if wc_min > 0 else 0
     else:
-        # Plateau above max (not penalized much)
-        wc_score = word_count_weight * 0.9
+        # No penalty for exceeding max (unless extreme, but keeping it simple for monotonicity)
+        wc_score = word_count_weight
     
     # Images sub-score
     img = draft_metrics['image_count']
     img_min = guidelines['images']['min']
-    img_min = guidelines['images']['min']
     img_max = guidelines['images'].get('max', guidelines['images'].get('optimal', img_min + 2))
     
-    if img >= img_min and img <= img_max:
-        img_score = images_weight
-    elif img < img_min:
+    if img < img_min:
         img_score = (img / img_min) * images_weight if img_min > 0 else 0
     else:
-        img_score = images_weight * 0.8  # Slight penalty for too many
+        # No penalty for more images
+        img_score = images_weight
     
-    # Paragraphs sub-score (reasonable paragraph count)
+    # Paragraphs sub-score
     para = draft_metrics['paragraph_count']
     expected_paragraphs = wc / 100  # Rough estimate: 100 words per paragraph
     
-    if para >= expected_paragraphs * 0.5:
-        para_score = paragraphs_weight
+    if expected_paragraphs > 0:
+        if para >= expected_paragraphs * 0.5:
+            para_score = paragraphs_weight
+        else:
+            para_score = (para / (expected_paragraphs * 0.5)) * paragraphs_weight
     else:
-        para_score = (para / expected_paragraphs) * paragraphs_weight if expected_paragraphs > 0 else 0
+        para_score = paragraphs_weight
     
     total_score = int(wc_score + img_score + para_score)
     

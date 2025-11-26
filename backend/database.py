@@ -56,11 +56,31 @@ class CompetitorStatus(str, enum.Enum):
 
 
 # Models
+class Project(Base):
+    """Project context container."""
+    __tablename__ = "projects"
+
+    id = Column(String(36), primary_key=True)  # UUID
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)  # Context for AI
+    target_audience = Column(String(200), nullable=True)
+    tone_of_voice = Column(String(50), nullable=True)
+    sitemap_url = Column(String(500), nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    analyses = relationship("Analysis", back_populates="project", cascade="all, delete-orphan")
+
+
 class Analysis(Base):
     """Main analysis record."""
     __tablename__ = "analyses"
     
     id = Column(String(36), primary_key=True)  # UUID
+    project_id = Column(String(36), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True)
+    
     keyword = Column(String(200), nullable=False, index=True)
     language = Column(String(10), nullable=False)
     location = Column(String(100), nullable=False)
@@ -73,6 +93,7 @@ class Analysis(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
+    project = relationship("Project", back_populates="analyses")
     competitors = relationship("Competitor", back_populates="analysis", cascade="all, delete-orphan")
     terms = relationship("Term", back_populates="analysis", cascade="all, delete-orphan")
     guideline = relationship("Guideline", back_populates="analysis", uselist=False, cascade="all, delete-orphan")
@@ -90,6 +111,11 @@ class Competitor(Base):
     url = Column(String(500), nullable=False)
     title = Column(String(300), nullable=True)
     domain = Column(String(200), nullable=True)
+    
+    # SERP metadata
+    snippet = Column(Text, nullable=True)  # Description from SERP
+    favicon_url = Column(String(500), nullable=True)  # Favicon URL
+    thumbnail_url = Column(String(500), nullable=True)  # Preview image URL
     
     word_count = Column(Integer, nullable=True)
     paragraph_count = Column(Integer, nullable=True)

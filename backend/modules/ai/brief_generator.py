@@ -22,7 +22,8 @@ class BriefGenerator:
         language: str,
         competitors_data: List[Dict[str, Any]],
         terms_data: List[Dict[str, Any]],
-        guidelines: Optional[Dict[str, Any]] = None
+        guidelines: Optional[Dict[str, Any]] = None,
+        project_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Generate a content brief.
@@ -39,7 +40,7 @@ class BriefGenerator:
         """
         try:
             prompt = self._build_prompt(
-                keyword, language, competitors_data, terms_data, guidelines
+                keyword, language, competitors_data, terms_data, guidelines, project_context
             )
             
             response = await self.ai_client.generate_json(prompt, temperature=0.7)
@@ -57,7 +58,8 @@ class BriefGenerator:
         language: str,
         competitors_data: List[Dict[str, Any]],
         terms_data: List[Dict[str, Any]],
-        guidelines: Optional[Dict[str, Any]]
+        guidelines: Optional[Dict[str, Any]],
+        project_context: Optional[Dict[str, Any]] = None
     ) -> str:
         """Build the prompt for brief generation."""
         
@@ -79,10 +81,22 @@ class BriefGenerator:
         wc_min = guidelines.get('word_count', {}).get('min', 800) if guidelines else 800
         wc_max = guidelines.get('word_count', {}).get('max', 1500) if guidelines else 1500
         
+        context_note = ""
+        if project_context and project_context.get('description'):
+            context_note = f"""\n!!! КОНТЕКСТ БРЕНДУ/ПРОЕКТУ !!!
+{project_context.get('description')}
+Цільова аудиторія: {project_context.get('target_audience', 'не вказана')}
+!!! КІНЕЦЬ КОНТЕКСТУ !!!
+"""
+        
         prompt = f"""Ти професійний SEO-стратег. Твоє завдання - створити детальний бриф (структуру) для статті.
 
 КЛЮЧОВЕ СЛОВО: {keyword}
 МОВА: {language}
+{context_note}
+ВАЖЛИВО: ПРОАНАЛІЗУЙ ІНТЕНТ (НАМІР) КОРИСТУВАЧА!
+Подивись на заголовки конкурентів нижче. Якщо вони пишуть про конкретний бренд, продукт або специфічну нішу - твій бриф МАЄ відповідати цьому контексту.
+Якщо є КОНТЕКСТ БРЕНДУ/ПРОЕКТУ вище - використовуй його як ПРІОРИТЕТНИЙ контекст!
 
 КОНКУРЕНТИ ВИКОРИСТОВУЮТЬ ТАКІ ЗАГОЛОВКИ:
 {competitor_structure}
@@ -138,10 +152,11 @@ async def generate_brief(
     language: str,
     competitors_data: List[Dict[str, Any]],
     terms_data: List[Dict[str, Any]],
-    guidelines: Optional[Dict[str, Any]] = None
+    guidelines: Optional[Dict[str, Any]] = None,
+    project_context: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """Convenience wrapper for BriefGenerator."""
     generator = BriefGenerator()
     return await generator.generate_brief(
-        keyword, language, competitors_data, terms_data, guidelines
+        keyword, language, competitors_data, terms_data, guidelines, project_context
     )

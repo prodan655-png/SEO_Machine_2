@@ -1,5 +1,5 @@
 // ===== Configuration =====
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://127.0.0.1:8000';
 const POLLING_INTERVAL = 2000; // 2 seconds
 const SCORE_DEBOUNCE = 500; // 0.5 seconds
 

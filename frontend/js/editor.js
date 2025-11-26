@@ -84,16 +84,69 @@ document.addEventListener('DOMContentLoaded', async () => {
         performScoring(els.editor.value);
     });
 
+    // AI Writer
+    document.getElementById('btn-ai-writer')?.addEventListener('click', () => {
+        if (!analysisId) return showToast('⚠️ Analysis ID required', 'warning');
+        // Trigger brief generation first as per workflow
+        document.getElementById('btn-generate-brief').click();
+    });
+
+    // Auto-Optimize
+    document.getElementById('btn-auto-optimize')?.addEventListener('click', async () => {
+        if (!analysisId) return showToast('⚠️ Analysis ID required', 'warning');
+
+        const content = els.editor.value;
+        if (!content.trim()) return showToast('⚠️ Write some content first', 'warning');
+
+        showToast('⚡ Optimizing content...', 'info');
+        store.setLoading('ai', true);
+
+        try {
+            const result = await window.API.autoOptimize(analysisId, content);
+            if (result.improved_content) {
+                // Show diff
+                if (window.showDiffModal) {
+                    window.showDiffModal(content, result.improved_content, result.changes || [], result.score_improvement || 0);
+                } else {
+                    // Fallback if diff modal missing
+                    els.editor.value = result.improved_content;
+                    store.updateContent(result.improved_content);
+                    await performScoring(result.improved_content);
+                    showToast(`✅ Optimized! Score: +${result.score_improvement}`, 'success');
+                }
+            }
+        } catch (e) {
+            console.error(e);
+            showToast('❌ Optimization failed', 'error');
+        } finally {
+            store.setLoading('ai', false);
+        }
+    });
+
+    // SEO Coach
     document.getElementById('btn-seo-coach')?.addEventListener('click', async () => {
-        showToast('🎓 Calling SEO Coach...', 'info');
-        if (window.showDiffModal) {
-            // Demo diff
-            const oldContent = els.editor.value;
-            const newContent = oldContent + '\n\n<p>Optimized content added by AI.</p>';
-            const changes = [
-                { type: 'add_term', term: keyword || 'keyword', reason: 'Missing term', old_text: '', new_text: 'Optimized content' }
-            ];
-            window.showDiffModal(oldContent, newContent, changes, 5);
+        if (store.score === 0) return showToast('⚠️ Score content first', 'warning');
+
+        showToast('🎓 Analyzing...', 'info');
+        try {
+            const scoreData = {
+                total_score: store.score,
+                breakdown: store.breakdown, // Get from store
+                term_details: store.terms,
+                structure_details: store.structure,
+                headings_details: store.headings
+            };
+
+            const advice = await window.API.getSeoCoaching(scoreData);
+            console.log('Coach advice:', advice);
+
+            // Show advice in a modal (reusing brief modal style for now or alert)
+            // Ideally create a specific coach modal
+            showCoachModal(advice);
+
+        } catch (e) {
+            console.error(e);
+            showToast('❌ Coach failed', 'error');
         }
     });
 
@@ -241,6 +294,51 @@ ${JSON.stringify(brief, null, 2)}
             }
         };
 
+        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+    }
+
+    function showCoachModal(advice) {
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7); display: flex;
+            align-items: center; justify-content: center; z-index: 10000;
+        `;
+
+        const content = document.createElement('div');
+        content.style.cssText = `
+            background: var(--bg-secondary, #1e293b); border-radius: 12px;
+            padding: 2rem; max-width: 600px; width: 90%; max-height: 80vh;
+            overflow-y: auto; position: relative; color: #fff;
+        `;
+
+        let actionsHtml = advice.priority_actions.map(a => `
+            <div style="background: rgba(59, 130, 246, 0.1); padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem; border-left: 4px solid #3b82f6;">
+                <div style="font-weight: bold; margin-bottom: 0.25rem;">${a.action}</div>
+                <div style="font-size: 0.9em; opacity: 0.8;">${a.details}</div>
+                <div style="font-size: 0.8em; margin-top: 0.5rem; color: #60a5fa;">Impact: ${a.score_gain}</div>
+            </div>
+        `).join('');
+
+        content.innerHTML = `
+            <h2 style="margin-bottom: 1rem;">🎓 SEO Coach Plan</h2>
+            <button id="closeCoachModal" style="position: absolute; top: 1rem; right: 1rem; background: transparent; border: none; color: #888; cursor: pointer; font-size: 1.5rem;">✕</button>
+            
+            <div style="margin-bottom: 1.5rem;">
+                <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem; color: #cbd5e1;">Priority Actions</h3>
+                ${actionsHtml}
+            </div>
+
+            <div style="text-align: right;">
+                <button class="btn btn-primary" onclick="this.closest('.fixed').remove()">Got it</button>
+            </div>
+        `;
+
+        modal.appendChild(content);
+        document.body.appendChild(modal);
+
+        // Fix close button
+        modal.querySelector('#closeCoachModal').onclick = () => modal.remove();
         modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
     }
 });

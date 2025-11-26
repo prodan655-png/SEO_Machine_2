@@ -15,6 +15,7 @@ document.addEventListener('alpine:init', () => {
 
         // Scoring
         score: 0,
+        breakdown: {}, // Added breakdown
         terms: [],
         structure: {},
         headings: {},
@@ -53,6 +54,7 @@ document.addEventListener('alpine:init', () => {
 
         updateScore(scoreData) {
             this.score = scoreData.total_score || 0;
+            this.breakdown = scoreData.breakdown || {}; // Save breakdown
             this.terms = scoreData.term_details || [];
             this.structure = scoreData.structure_details || {};
             this.headings = scoreData.headings_details || {};

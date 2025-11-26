@@ -1,5 +1,5 @@
 // API Client Module
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'http://127.0.0.1:8000';
 
 const API = {
     // Health Check
@@ -89,6 +89,37 @@ const API = {
             })
         });
         if (!response.ok) throw new Error('Failed to generate images');
+        return await response.json();
+    },
+
+    autoOptimize: async (analysisId, content, targetScore = 85) => {
+        const response = await fetch(`${API_BASE}/api/ai/iterate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                analysis_id: analysisId,
+                content: content,
+                target_score: targetScore,
+                max_iterations: 3
+            })
+        });
+        if (!response.ok) throw new Error('Failed to optimize content');
+        return await response.json();
+    },
+
+    getSeoCoaching: async (scoreData) => {
+        const response = await fetch(`${API_BASE}/api/ai/coach`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                current_score: scoreData.total_score,
+                breakdown: scoreData.breakdown,
+                term_details: scoreData.term_details,
+                structure_details: scoreData.structure_details,
+                headings_details: scoreData.headings_details
+            })
+        });
+        if (!response.ok) throw new Error('Failed to get coaching');
         return await response.json();
     }
 };

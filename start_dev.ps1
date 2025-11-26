@@ -6,13 +6,21 @@ if (-not (Test-Path "backend/main.py")) {
     exit 1
 }
 
+# Get the current directory
+$rootDir = Get-Location
+
 # Start Backend in a new window (keeping it open)
 Write-Host "🔧 Starting Backend..." -ForegroundColor Yellow
-Start-Process -FilePath "cmd.exe" -ArgumentList '/k cd backend & python -m uvicorn main:app --reload --port 8000'
+$backendCmd = 'cd /d "' + $rootDir + '\backend" & python -m uvicorn main:app --reload --port 8000'
+Start-Process -FilePath "cmd.exe" -ArgumentList "/k $backendCmd"
+
+# Wait a moment before starting frontend
+Start-Sleep -Seconds 1
 
 # Start Frontend in a new window (keeping it open)
 Write-Host "🎨 Starting Frontend..." -ForegroundColor Yellow
-Start-Process -FilePath "cmd.exe" -ArgumentList '/k cd frontend & python -m http.server 8080'
+$frontendCmd = 'cd /d "' + $rootDir + '\frontend" & python -m http.server 8080'
+Start-Process -FilePath "cmd.exe" -ArgumentList "/k $frontendCmd"
 
 Write-Host ""
 Write-Host "✅ Development environment started!" -ForegroundColor Green

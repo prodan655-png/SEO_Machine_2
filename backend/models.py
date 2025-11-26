@@ -31,8 +31,17 @@ class FormatType(str, Enum):
 
 
 # Request Models
+class ProjectCreateRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=100)
+    description: Optional[str] = None
+    target_audience: Optional[str] = None
+    tone_of_voice: Optional[str] = None
+    sitemap_url: Optional[str] = None
+
+
 class AnalysisCreateRequest(BaseModel):
     keyword: str = Field(..., min_length=2, max_length=100)
+    project_id: Optional[str] = None
     language: str = Field(..., min_length=2, max_length=10)
     location: str = Field(..., min_length=2, max_length=100)
     device: DeviceType = DeviceType.DESKTOP
@@ -76,6 +85,17 @@ class AICoachRequest(BaseModel):
 
 
 # Response Models
+class ProjectResponse(BaseModel):
+    id: str
+    name: str
+    description: Optional[str]
+    target_audience: Optional[str]
+    tone_of_voice: Optional[str]
+    sitemap_url: Optional[str]
+    created_at: str
+    updated_at: str
+
+
 class CompetitorResponse(BaseModel):
     position: int
     url: str

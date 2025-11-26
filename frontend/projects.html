@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Проекти - SEO Machine</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="nav">
+            <div class="brand">📊 SEO Machine</div>
+            <div class="nav-links">
+                <a href="index.html">Головна</a>
+                <a href="projects.html" class="active">Проекти</a>
+                <a href="editor.html">Редактор</a>
+                <a href="competitors.html">Конкуренти</a>
+            </div>
+        </nav>
+
+        <div class="content">
+            <div class="header-row">
+                <h1>🗂️ Управління Проектами</h1>
+                <button id="btn-new-project" class="btn btn-primary">+ Новий Проект</button>
+            </div>
+
+            <div id="projects-list" class="projects-grid"></div>
+        </div>
+    </div>
+
+    <!-- Modal for creating project -->
+    <div id="project-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h2>Створити Проект</h2>
+            <form id="project-form">
+                <div class="form-group">
+                    <label>Назва проекту *</label>
+                    <input type="text" id="project-name" required placeholder="наприклад: Flakes">
+                </div>
+                <div class="form-group">
+                    <label>Опис бренду/продукту</label>
+                    <textarea id="project-description" rows="4" placeholder="Опишіть що це за бренд, продукт або ніша. Це допоможе AI краще зрозуміти контекст."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Цільова аудиторія</label>
+                    <input type="text" id="project-audience" placeholder="наприклад: Пекарі, кондитери">
+                </div>
+                <div class="form-group">
+                    <label>Тональність</label>
+                    <select id="project-tone">
+                        <option value="">Не вказано</option>
+                        <option value="professional">Професійна</option>
+                        <option value="friendly">Дружня</option>
+                        <option value="expert">Експертна</option>
+                    </select>
+                </div>
+                <div class="form-buttons">
+                    <button type="button" id="btn-cancel" class="btn btn-secondary">Скасувати</button>
+                    <button type="submit" class="btn btn-primary">Створити</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/projects.js"></script>
+</body>
+</html>
